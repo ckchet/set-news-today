@@ -40,6 +40,26 @@ TITLE_KEYS = ["subject", "title", "header", "newsSubject", "headline", "name"]
 DATE_KEYS = ["datetime", "date", "newsDate", "publishDate", "createDate", "dateTime"]
 ID_KEYS = ["newsId", "id", "docId", "no", "seq"]
 LINK_KEYS = ["url", "link", "newsUrl", "detailUrl"]
+CATEGORY_KEYS = ["newsType", "category", "type", "typeName", "newsCategory", "group"]
+
+# ==== ตั้งค่าหัวข้อข่าวที่สนใจ ====
+# ใส่คำที่ต้องการกรองไว้ในลิสต์นี้ (ไม่สนตัวพิมพ์เล็ก/ใหญ่)
+# ถ้าปล่อยเป็น [] (ลิสต์ว่าง) = ไม่กรอง ส่งทุกข่าวเหมือนเดิม
+# ระบบจะเช็คคำเหล่านี้ทั้งจาก "หัวข้อข่าว" และ "ประเภทข่าว" (ถ้าเว็บส่งฟิลด์ประเภทข่าวมาด้วย)
+TOPIC_KEYWORDS = [
+    "งบการเงิน",
+    "ผลประกอบการ",
+    "งบไตรมาส",
+    "กำไรสุทธิ",
+    "Earnings",
+    "คำอธิบายและวิเคราะห์",
+    "แจ้งเลิกกิจการ",
+    "แผนปรับโครงสร้างธุรกิจ",
+    "ชี้แจงข้อเท็จจริง",
+    "สรุปผลการดำเนินงาน",
+    "จ่ายปันผล",
+    "รายงานประจำปี",
+]
 
 
 def log(*args):
@@ -77,6 +97,16 @@ def extract_field(item: dict, keys):
             if actual_key.lower() == k.lower():
                 return item[actual_key]
     return None
+
+
+def matches_topic_filter(item: dict) -> bool:
+    """คืนค่า True ถ้าข่าวนี้ผ่านตัวกรองหัวข้อ (หรือไม่ได้ตั้งตัวกรองไว้เลย)"""
+    if not TOPIC_KEYWORDS:
+        return True
+    title = str(extract_field(item, TITLE_KEYS) or "")
+    category = str(extract_field(item, CATEGORY_KEYS) or "")
+    haystack = f"{title} {category}".lower()
+    return any(kw.lower() in haystack for kw in TOPIC_KEYWORDS)
 
 
 def make_news_id(item: dict) -> str:
@@ -188,7 +218,7 @@ async def main():
     for item in items:
         nid = make_news_id(item)
         current_ids.append(nid)
-        if nid not in seen_ids:
+        if nid not in seen_ids and matches_topic_filter(item):
             new_items.append((nid, item))
 
     if not new_items:
