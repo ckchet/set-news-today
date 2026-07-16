@@ -71,9 +71,25 @@ TOPIC_KEYWORDS = [
     "แบบรายงานผลการซื้อหุ้นคืน",
 ]
 
-# ถ้าต้องการดูเฉพาะบางหุ้น ใส่ชื่อย่อไว้ในนี้ เช่น ["PTT", "AOT", "CPALL"]
-# ปล่อยเป็น [] = ไม่กรองหุ้น รับทุกหลักทรัพย์
-SYMBOL_FILTER = []
+# ใส่ชื่อย่อหุ้นที่สนใจเป็นพิเศษไว้ในนี้ เช่น ["PTT", "AOT", "CPALL"]
+# หุ้นในลิสต์นี้จะได้รับข่าวส่งเข้า Telegram "ทุกข่าว" โดยไม่ต้องผ่านตัวกรอง TOPIC_KEYWORDS ด้านบนเลย
+# ส่วนหุ้นอื่นๆ ที่ไม่อยู่ในลิสต์นี้ ยังคงต้องผ่านตัวกรอง TOPIC_KEYWORDS ตามปกติ
+# ปล่อยเป็น [] = ไม่มีหุ้นพิเศษ ใช้ตัวกรอง TOPIC_KEYWORDS กับทุกหุ้นเท่ากันหมด
+#
+# ตัวอย่างด้านล่างเป็นหุ้นขนาดใหญ่/เป็นที่รู้จักทั่วไปในตลาดหุ้นไทย 50 ตัว (กลุ่มธนาคาร พลังงาน
+# ค้าปลีก อสังหาฯ สื่อสาร ฯลฯ) เป็นแค่ตัวอย่างเริ่มต้น ไม่ใช่รายชื่อ SET50 อย่างเป็นทางการ
+# (SET จะทบทวนรายชื่อ SET50 จริงทุก 6 เดือน) แก้ไข/ลบ/เพิ่มตามหุ้นที่คุณสนใจจริงๆ ได้เลย
+SYMBOL_FILTER = [
+    "ADVANC", "AOT", "AWC", "BANPU", "BBL", "BDMS", "BEM", "BGRIM", "BH", "BTS",
+    "CBG", "CENTEL", "COM7", "CPALL", "CPF", "CPN", "CRC", "DELTA", "EA", "EGCO",
+    "GLOBAL", "GPSC", "GULF", "HMPRO", "INTUCH", "IVL", "JMART", "KBANK", "KTB", "KTC",
+    "LH", "MINT", "MTC", "OR", "OSP", "PTT", "PTTEP", "PTTGC", "RATCH", "SAWAD",
+    "SCB", "SCC", "SCGP", "SIRI", "TIDLOR", "TISCO", "TOP", "TRUE", "TTB", "TU","TACC","KCG","NSL",
+    "SNP","AU","MAGURO","OKJ","XO","MC","SABINA","NEO","BLC","MEGA","MTC","SAK",
+    "TURBO","MEB","MOSHI","TOG","AURA","DOHOME","MRDIYT","ILM","ADVICE","HL","CPAXT",
+    "MOTHER","TNP","SVT","WASH","EKH","PR9","RPH","WPH","KLINIQ","KTMS","LTMH","PRTR","SISB","SPA",
+    "SAV","BOL","READY","HUMAN",
+]
 
 
 def log(*args):
@@ -114,19 +130,28 @@ def extract_field(item: dict, keys):
 
 
 def matches_topic_filter(item: dict) -> bool:
-    """คืนค่า True ถ้าข่าวนี้ผ่านตัวกรองหัวข้อ และตัวกรองหุ้น (หรือไม่ได้ตั้งตัวกรองไว้เลย)"""
+    """
+    คืนค่า True ถ้าข่าวนี้ควรถูกส่งเข้า Telegram
+
+    กติกา:
+    - ถ้าข่าวนี้เป็นของหุ้นที่อยู่ใน SYMBOL_FILTER (หุ้นที่สนใจเป็นพิเศษ) -> ส่งทุกข่าวเลย ไม่ต้องเช็คหัวข้อ
+    - ถ้าไม่ใช่หุ้นในลิสต์ (หรือไม่ได้ตั้ง SYMBOL_FILTER ไว้เลย) -> ต้องผ่านตัวกรองหัวข้อ TOPIC_KEYWORDS ก่อน ถึงจะส่ง
+    - ถ้าไม่ได้ตั้งทั้ง SYMBOL_FILTER และ TOPIC_KEYWORDS ไว้เลย -> ส่งทุกข่าว (ไม่กรองอะไรเลย)
+    """
+    symbol = str(extract_field(item, SYMBOL_KEYS) or "").upper()
+
+    # หุ้นที่สนใจเป็นพิเศษ -> ผ่านทันที ไม่เช็คหัวข้อ
+    if SYMBOL_FILTER and symbol in [s.upper() for s in SYMBOL_FILTER]:
+        return True
+
+    # หุ้นอื่นๆ (หรือข่าวที่ไม่มีชื่อหุ้นผูกอยู่) -> ต้องผ่านตัวกรองหัวข้อ ถ้ามีการตั้งไว้
     if TOPIC_KEYWORDS:
         title = str(extract_field(item, TITLE_KEYS) or "")
         category = str(extract_field(item, CATEGORY_KEYS) or "")
         haystack = f"{title} {category}".lower()
-        if not any(kw.lower() in haystack for kw in TOPIC_KEYWORDS):
-            return False
+        return any(kw.lower() in haystack for kw in TOPIC_KEYWORDS)
 
-    if SYMBOL_FILTER:
-        symbol = str(extract_field(item, SYMBOL_KEYS) or "").upper()
-        if symbol not in [s.upper() for s in SYMBOL_FILTER]:
-            return False
-
+    # ไม่ได้ตั้งตัวกรองอะไรไว้เลย -> ส่งทุกข่าว
     return True
 
 
