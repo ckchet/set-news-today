@@ -35,12 +35,17 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 DEBUG = os.environ.get("DEBUG", "0") == "1"
 
+# ตั้งเป็น True ถ้าอยากให้ส่งข้อความเข้า Telegram ทุกครั้งที่บอทรัน แม้ไม่มีข่าวใหม่ก็ตาม
+# ตั้งเป็น False ถ้าอยากให้เงียบไว้ ส่งเฉพาะตอนมีข่าวใหม่จริงๆ เท่านั้น (ค่าเดิม)
+SEND_NO_NEWS_NOTIFICATION = True
+
 # คำใบ้ที่ใช้เดาว่า field ไหนคือ "หัวข้อข่าว" / "วันที่" / "รหัสข่าว" / "ลิงก์"
 TITLE_KEYS = ["subject", "title", "header", "newsSubject", "headline", "name"]
 DATE_KEYS = ["datetime", "date", "newsDate", "publishDate", "createDate", "dateTime"]
 ID_KEYS = ["newsId", "id", "docId", "no", "seq"]
 LINK_KEYS = ["url", "link", "newsUrl", "detailUrl"]
 CATEGORY_KEYS = ["newsType", "category", "type", "typeName", "newsCategory", "group"]
+SYMBOL_KEYS = ["symbol", "stockSymbol", "securitySymbol", "companySymbol", "ticker"]
 
 # ==== ตั้งค่าหัวข้อข่าวที่สนใจ ====
 # ใส่คำที่ต้องการกรองไว้ในลิสต์นี้ (ไม่สนตัวพิมพ์เล็ก/ใหญ่)
@@ -64,6 +69,10 @@ TOPIC_KEYWORDS = [
     "แจ้งการเลิกบริษัทย่อย",
     "XD",
 ]
+
+# ถ้าต้องการดูเฉพาะบางหุ้น ใส่ชื่อย่อไว้ในนี้ เช่น ["PTT", "AOT", "CPALL"]
+# ปล่อยเป็น [] = ไม่กรองหุ้น รับทุกหลักทรัพย์
+SYMBOL_FILTER = []
 
 
 def log(*args):
@@ -104,13 +113,20 @@ def extract_field(item: dict, keys):
 
 
 def matches_topic_filter(item: dict) -> bool:
-    """คืนค่า True ถ้าข่าวนี้ผ่านตัวกรองหัวข้อ (หรือไม่ได้ตั้งตัวกรองไว้เลย)"""
-    if not TOPIC_KEYWORDS:
-        return True
-    title = str(extract_field(item, TITLE_KEYS) or "")
-    category = str(extract_field(item, CATEGORY_KEYS) or "")
-    haystack = f"{title} {category}".lower()
-    return any(kw.lower() in haystack for kw in TOPIC_KEYWORDS)
+    """คืนค่า True ถ้าข่าวนี้ผ่านตัวกรองหัวข้อ และตัวกรองหุ้น (หรือไม่ได้ตั้งตัวกรองไว้เลย)"""
+    if TOPIC_KEYWORDS:
+        title = str(extract_field(item, TITLE_KEYS) or "")
+        category = str(extract_field(item, CATEGORY_KEYS) or "")
+        haystack = f"{title} {category}".lower()
+        if not any(kw.lower() in haystack for kw in TOPIC_KEYWORDS):
+            return False
+
+    if SYMBOL_FILTER:
+        symbol = str(extract_field(item, SYMBOL_KEYS) or "").upper()
+        if symbol not in [s.upper() for s in SYMBOL_FILTER]:
+            return False
+
+    return True
 
 
 def make_news_id(item: dict) -> str:
@@ -194,9 +210,13 @@ def send_telegram_message(text: str):
 
 def format_message(item: dict) -> str:
     title = extract_field(item, TITLE_KEYS) or "(ไม่พบหัวข้อข่าว)"
+    symbol = extract_field(item, SYMBOL_KEYS)
     date = extract_field(item, DATE_KEYS) or ""
     link = extract_field(item, LINK_KEYS)
-    text = f"📰 <b>ข่าวใหม่จาก SET</b>\n{title}"
+    if symbol:
+        text = f"📰 <b>ข่าวใหม่จาก SET</b>\n<b>[{symbol}]</b> {title}"
+    else:
+        text = f"📰 <b>ข่าวใหม่จาก SET</b>\n{title}"
     if date:
         text += f"\n🕒 {date}"
     if link:
@@ -212,6 +232,8 @@ async def main():
     items = await fetch_news_items()
     if not items:
         print("ไม่พบรายการข่าว (ดู DEBUG log ถ้าต้องการตรวจสอบ)")
+        if SEND_NO_NEWS_NOTIFICATION:
+            send_telegram_message("⚠️ ตรวจแล้ว แต่ดึงรายการข่าวจากเว็บ SET ไม่ได้เลย (อาจเป็นเพราะเว็บเปลี่ยนโครงสร้าง)")
         return
 
     state = load_state()
@@ -227,6 +249,8 @@ async def main():
 
     if not new_items:
         print("ไม่มีข่าวใหม่")
+        if SEND_NO_NEWS_NOTIFICATION:
+            send_telegram_message("✅ ตรวจแล้ว ยังไม่มีข่าวใหม่ที่ตรงเงื่อนไข")
     else:
         print(f"พบข่าวใหม่ {len(new_items)} รายการ กำลังส่งเข้า Telegram...")
         # ส่งจากเก่าไปใหม่ จะได้เรียงลำดับใน Telegram สวยงาม
