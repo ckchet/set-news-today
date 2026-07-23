@@ -22,7 +22,9 @@ import json
 import os
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from playwright.async_api import async_playwright
 import requests
@@ -35,9 +37,17 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 DEBUG = os.environ.get("DEBUG", "0") == "1"
 
-# ตั้งเป็น True ถ้าอยากให้ส่งข้อความเข้า Telegram ทุกครั้งที่บอทรัน แม้ไม่มีข่าวใหม่ก็ตาม
-# ตั้งเป็น False ถ้าอยากให้เงียบไว้ ส่งเฉพาะตอนมีข่าวใหม่จริงๆ เท่านั้น (ค่าเดิม)
-SEND_NO_NEWS_NOTIFICATION = True
+BANGKOK_TZ = ZoneInfo("Asia/Bangkok")
+
+# ชั่วโมง (เวลาไทย) ของรอบทำงานสุดท้ายในแต่ละวัน ตามตารางที่ตั้งไว้ใน .github/workflows/monitor.yml
+# ใช้เพื่อรู้ว่า "รอบนี้เป็นรอบสุดท้ายของวันหรือไม่" (ถ้าแก้เวลาใน workflow ให้แก้เลขนี้ตามด้วย)
+LAST_RUN_HOUR = 22
+
+# ข้อความแจ้งเตือนตอนไม่มีข่าวใหม่ที่ตรงเงื่อนไข:
+# - รอบทำงานทั่วไประหว่างวัน -> "เงียบ" ไม่ส่งอะไรเลย (ไม่ส่งซ้ำทุก 15/30 นาที)
+# - รอบแรกของวัน (ถ้าวันนั้นยังไม่มีข่าวเลย) -> ส่ง "มารอดูกันว่า วันนี้จะมีข่าวอะไรใหม่"
+# - รอบสุดท้ายของวัน (ถ้าทั้งวันไม่มีข่าวเข้าเงื่อนไขเลยสักครั้ง) -> ส่ง "วันนี้ยังไม่มีข่าวอะไรใหม่"
+# ถ้าดึงข่าวจากเว็บไม่ได้เลย (ปัญหาทางเทคนิค) จะแจ้งเตือนทุกครั้งเสมอ ไม่ว่าจะเป็นรอบไหน (เพื่อให้รู้ทันทีว่าบอทมีปัญหา)
 
 # คำใบ้ที่ใช้เดาว่า field ไหนคือ "หัวข้อข่าว" / "วันที่" / "รหัสข่าว" / "ลิงก์"
 TITLE_KEYS = ["subject", "title", "header", "newsSubject", "headline", "name"]
@@ -53,22 +63,10 @@ SYMBOL_KEYS = ["symbol", "stockSymbol", "securitySymbol", "companySymbol", "tick
 # ระบบจะเช็คคำเหล่านี้ทั้งจาก "หัวข้อข่าว" และ "ประเภทข่าว" (ถ้าเว็บส่งฟิลด์ประเภทข่าวมาด้วย)
 TOPIC_KEYWORDS = [
     "งบการเงิน",
-    "งบการเงินรายปี",
     "ผลประกอบการ",
     "งบไตรมาส",
     "กำไรสุทธิ",
     "Earnings",
-    "คำอธิบายและวิเคราะห์",
-    "แจ้งเลิกกิจการ",
-    "แผนปรับโครงสร้างธุรกิจ",
-    "ชี้แจงข้อเท็จจริง",
-    "สรุปผลการดำเนินงานของ",
-    "จ่ายปันผล",
-    "รายงานประจำปี",
-    "แจ้งการจัดตั้งบริษัทย่อย",
-    "แจ้งการเลิกบริษัทย่อย",
-    "XD",
-    "แบบรายงานผลการซื้อหุ้นคืน",
 ]
 
 # ใส่ชื่อย่อหุ้นที่สนใจเป็นพิเศษไว้ในนี้ เช่น ["PTT", "AOT", "CPALL"]
@@ -84,11 +82,7 @@ SYMBOL_FILTER = [
     "CBG", "CENTEL", "COM7", "CPALL", "CPF", "CPN", "CRC", "DELTA", "EA", "EGCO",
     "GLOBAL", "GPSC", "GULF", "HMPRO", "INTUCH", "IVL", "JMART", "KBANK", "KTB", "KTC",
     "LH", "MINT", "MTC", "OR", "OSP", "PTT", "PTTEP", "PTTGC", "RATCH", "SAWAD",
-    "SCB", "SCC", "SCGP", "SIRI", "TIDLOR", "TISCO", "TOP", "TRUE", "TTB", "TU","TACC","KCG","NSL",
-    "SNP","AU","MAGURO","OKJ","XO","MC","SABINA","NEO","BLC","MEGA","MTC","SAK",
-    "TURBO","MEB","MOSHI","TOG","AURA","DOHOME","MRDIYT","ILM","ADVICE","HL","CPAXT",
-    "MOTHER","TNP","SVT","WASH","EKH","PR9","RPH","WPH","KLINIQ","KTMS","LTMH","PRTR","SISB","SPA",
-    "SAV","BOL","READY","HUMAN",
+    "SCB", "SCC", "SCGP", "SIRI", "TIDLOR", "TISCO", "TOP", "TRUE", "TTB", "TU",
 ]
 
 
@@ -209,12 +203,30 @@ async def fetch_news_items():
 
 def load_state():
     if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text(encoding="utf-8"))
-    return {"seen_ids": []}
+        state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    else:
+        state = {}
+    state.setdefault("seen_ids", [])
+    state.setdefault("date", "")
+    state.setdefault("had_news_today", False)
+    state.setdefault("first_notified_today", False)
+    state.setdefault("last_summary_sent_today", False)
+    return state
 
 
 def save_state(state):
     STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def escape_html(text: str) -> str:
+    """กัน error 400 จาก Telegram เมื่อข้อความมีอักขระพิเศษของ HTML (&, <, >)
+    ที่ดึงมาจากหัวข้อข่าวจริงบนเว็บ ซึ่งอาจมีสัญลักษณ์เหล่านี้ปนอยู่โดยไม่คาดคิด"""
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
 
 
 def send_telegram_message(text: str):
@@ -231,16 +243,20 @@ def send_telegram_message(text: str):
         },
         timeout=15,
     )
+    if resp.status_code != 200:
+        # โชว์ข้อความ error จริงที่ Telegram ตอบกลับมา (เช่น "chat not found", "can't parse entities")
+        # เพื่อให้รู้สาเหตุที่แท้จริงแทนที่จะเห็นแค่ "400 Bad Request" เฉยๆ
+        print(f"Telegram API error response: {resp.text}", file=sys.stderr)
     resp.raise_for_status()
 
 
 def format_message(item: dict) -> str:
-    title = extract_field(item, TITLE_KEYS) or "(ไม่พบหัวข้อข่าว)"
+    title = escape_html(extract_field(item, TITLE_KEYS) or "(ไม่พบหัวข้อข่าว)")
     symbol = extract_field(item, SYMBOL_KEYS)
-    date = extract_field(item, DATE_KEYS) or ""
+    date = escape_html(extract_field(item, DATE_KEYS) or "")
     link = extract_field(item, LINK_KEYS)
     if symbol:
-        text = f"📰 <b>ข่าวใหม่จาก SET</b>\n<b>[{symbol}]</b> {title}"
+        text = f"📰 <b>ข่าวใหม่จาก SET</b>\n<b>[{escape_html(symbol)}]</b> {title}"
     else:
         text = f"📰 <b>ข่าวใหม่จาก SET</b>\n{title}"
     if date:
@@ -248,21 +264,37 @@ def format_message(item: dict) -> str:
     if link:
         if isinstance(link, str) and link.startswith("/"):
             link = "https://www.set.or.th" + link
-        text += f"\n🔗 {link}"
+        text += f"\n🔗 {escape_html(link)}"
     else:
         text += f"\n🔗 {PAGE_URL}"
     return text
 
 
 async def main():
+    now_bkk = datetime.now(BANGKOK_TZ)
+    today_str = now_bkk.strftime("%Y-%m-%d")
+
+    state = load_state()
+
+    # ถ้าเป็นวันใหม่ (เทียบกับวันที่บันทึกไว้ครั้งก่อน) ให้รีเซ็ตสถานะรายวันทั้งหมด
+    if state.get("date") != today_str:
+        state["date"] = today_str
+        state["had_news_today"] = False
+        state["first_notified_today"] = False
+        state["last_summary_sent_today"] = False
+
+    is_first_run_today = not state["first_notified_today"]
+    is_last_run_hour = now_bkk.hour == LAST_RUN_HOUR
+
     items = await fetch_news_items()
     if not items:
         print("ไม่พบรายการข่าว (ดู DEBUG log ถ้าต้องการตรวจสอบ)")
-        if SEND_NO_NEWS_NOTIFICATION:
-            send_telegram_message("⚠️ ตรวจแล้ว แต่ดึงรายการข่าวจากเว็บ SET ไม่ได้เลย (อาจเป็นเพราะเว็บเปลี่ยนโครงสร้าง)")
+        # ปัญหาทางเทคนิค (ดึงข่าวไม่ได้เลย) แจ้งเตือนเสมอทุกครั้ง ไม่ว่าจะรอบไหน เพื่อให้รู้ทันทีว่าบอทมีปัญหา
+        send_telegram_message("⚠️ ตรวจแล้ว แต่ดึงรายการข่าวจากเว็บ SET ไม่ได้เลย (อาจเป็นเพราะเว็บเปลี่ยนโครงสร้าง)")
+        state["first_notified_today"] = True
+        save_state(state)
         return
 
-    state = load_state()
     seen_ids = set(state.get("seen_ids", []))
 
     new_items = []
@@ -275,17 +307,28 @@ async def main():
 
     if not new_items:
         print("ไม่มีข่าวใหม่")
-        if SEND_NO_NEWS_NOTIFICATION:
-            send_telegram_message("✅ ตรวจแล้ว ยังไม่มีข่าวใหม่ที่ตรงเงื่อนไข")
+
+        # รอบแรกของวัน (ยังไม่มีข่าวเลย) -> ทักทายว่ามารอดูกัน
+        if is_first_run_today:
+            send_telegram_message("👀 มารอดูกันว่า วันนี้จะมีข่าวอะไรใหม่")
+
+        # รอบสุดท้ายของวัน + ทั้งวันไม่มีข่าวเข้าเงื่อนไขเลยสักครั้ง -> สรุปให้ทราบ
+        if is_last_run_hour and not state["had_news_today"] and not state["last_summary_sent_today"]:
+            send_telegram_message("🌙 วันนี้ยังไม่มีข่าวอะไรใหม่")
+            state["last_summary_sent_today"] = True
     else:
         print(f"พบข่าวใหม่ {len(new_items)} รายการ กำลังส่งเข้า Telegram...")
         # ส่งจากเก่าไปใหม่ จะได้เรียงลำดับใน Telegram สวยงาม
         for nid, item in reversed(new_items):
             send_telegram_message(format_message(item))
+        state["had_news_today"] = True
+
+    state["first_notified_today"] = True
 
     # เก็บเฉพาะ id ที่ยังปรากฏอยู่ในหน้าเว็บล่าสุด + ที่เคยเห็น (กันไฟล์บวมไม่รู้จบ เก็บแค่ 500 รายการล่าสุด)
     updated_ids = list(dict.fromkeys(current_ids + list(seen_ids)))[:500]
-    save_state({"seen_ids": updated_ids})
+    state["seen_ids"] = updated_ids
+    save_state(state)
 
 
 if __name__ == "__main__":
