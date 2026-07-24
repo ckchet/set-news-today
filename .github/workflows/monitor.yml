@@ -1,21 +1,27 @@
 name: Monitor SET News to Telegram
 
 on:
-  schedule:
-    # เก็บ schedule ในตัวไว้เป็น backup (อาจดีเลย์ได้บ้างตามข้อจำกัดของ GitHub)
-    # เวลาใน cron เป็น UTC เสมอ (เวลาไทย = UTC + 7 ชม.)
-    - cron: "7,37 23 * * 0-4"   # 23:07,23:37 UTC (วันก่อนหน้า) = 06:07,06:37 น. ไทย
-    - cron: "7,37 0 * * 1-5"    # 00:07,00:37 UTC = 07:07,07:37 น. ไทย
-    - cron: "7,22,37,52 1-9 * * 1-5"  # 01:07-09:52 UTC = 08:07-16:52 น. ไทย
-    - cron: "7,37 10-14 * * 1-5"  # 10:07-14:37 UTC = 17:07-21:37 น. ไทย
-    - cron: "7 15 * * 1-5"        # 15:07 UTC = 22:07 น. ไทย
+  # ปิด native schedule ไว้ก่อน เพราะทำงานควบคู่กับ repository_dispatch (จาก cron-job.org) พร้อมกัน
+  # ทำให้เกิดการรันซ้อนกัน (concurrent runs) จนส่งข่าวซ้ำได้ ถ้าอยากเปิดกลับมาใช้คู่กัน
+  # ต้องตั้งเวลาให้ "ไม่ชนกัน" กับที่ตั้งไว้ใน cron-job.org เอง (ดูคำอธิบายใน README)
+  # schedule:
+  #   - cron: "7,37 23 * * 0-4"
+  #   - cron: "7,37 0 * * 1-5"
+  #   - cron: "7,22,37,52 1-9 * * 1-5"
+  #   - cron: "7,37 10-14 * * 1-5"
+  #   - cron: "7 15 * * 1-5"
 
-  # ให้บริการ cron ภายนอก (เช่น cron-job.org) เรียก GitHub API มาสั่งรันได้ตรงเวลากว่า
-  # native schedule ด้านบน ดูวิธีตั้งค่าใน README หัวข้อ "ใช้ cron ภายนอกแทน (แม่นยำกว่า)"
+  # ให้บริการ cron ภายนอก (cron-job.org) เรียก GitHub API มาสั่งรันตามเวลาที่ตั้งไว้
   repository_dispatch:
     types: [run-check]
 
   workflow_dispatch: {}   # ให้กดรันเองได้จากแท็บ Actions เพื่อทดสอบ
+
+# กันไม่ให้ workflow รันซ้อนกันเด็ดขาด (ถ้ามีคำสั่งใหม่เข้ามาระหว่างที่รอบเก่ายังไม่เสร็จ ให้ต่อคิวแทน)
+# นี่คือเกราะป้องกันชั้นสุดท้าย เผื่อมีการยิงคำสั่งมาถี่/ซ้อนกันโดยไม่ตั้งใจ
+concurrency:
+  group: monitor-set-news
+  cancel-in-progress: false
 
 jobs:
   check-news:
@@ -48,4 +54,6 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add state.json
           git diff --cached --quiet || git commit -m "update state.json [skip ci]"
-          git push
+          # ดึงการเปลี่ยนแปลงล่าสุดมา rebase ก่อน push เผื่อมี commit อื่นแซงเข้ามาระหว่างที่ job นี้กำลังรัน
+          git pull --rebase origin "${{ github.ref_name }}"
+          git push origin HEAD:"${{ github.ref_name }}"
