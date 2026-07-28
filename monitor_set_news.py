@@ -1,4 +1,4 @@
-""
+"""
 ตรวจข่าวใหม่จากหน้า "ข่าวหลักทรัพย์" ของตลาดหลักทรัพย์แห่งประเทศไทย (SET)
 แล้วส่งแจ้งเตือนเข้า Telegram เมื่อพบข่าวที่ยังไม่เคยแจ้งมาก่อน
 
@@ -83,16 +83,6 @@ SYMBOL_FILTER = [
     "GLOBAL", "GPSC", "GULF", "HMPRO", "INTUCH", "IVL", "JMART", "KBANK", "KTB", "KTC",
     "LH", "MINT", "MTC", "OR", "OSP", "PTT", "PTTEP", "PTTGC", "RATCH", "SAWAD",
     "SCB", "SCC", "SCGP", "SIRI", "TIDLOR", "TISCO", "TOP", "TRUE", "TTB", "TU",
-   "TACC","KCG","NSL","SNP","AU","MAGURO","OKJ","XO","MC","SABINA","NEO","BLC","MEGA",
-   "SAK","TURBO","MEB","MOSHI","TOG","TACC","AURA","DOHOME","MRDIYT","ILM","ADVICE",
-   "HL","CPAXT","MOTHER","WPH","KLINIQ","KTMS","LTMH","PRTR","SISB","SPA","SAV","BOL",
-   "READY","HUMAN","BIZ","IP","KISS","TMAN","TNR","88TH","EURO","ITTHI","MGI","MOONG",
-   "NUT","RAM","VIBHA","CHG","SKR","THG","PRINC","MASTER","RJH","BKGI","KDH","LPH","PR9",
-   "TNH","ONEE","PLANB","SO","ASIA","BJC","IT","SPC","SVT","TAN","FSMART","JPARK","KOOL",
-   "MPJ","PLT","MITSIB","TQR","TOA","TASCO","SCCC","DCC","TPIPL","UMI","WINDOW","WIIK",
-   "DITTO","INET","INSET","MFEC","MSC","PT","SAMART","SIS","SVOA","SYNEX","TRUE","COCOCO",
-   "CPI","FM","HTC","ITC","JDF","KBS","LST","M","OSP","PM","SAPPE","SAUCE","SNNP","SNPS",
-   "SSF","SUN","TFMAMA","TKN","TVO","TWPC","ZEN","TMILL","NTSC","WINNER"
 ]
 
 
@@ -326,7 +316,7 @@ async def main():
 
         # รอบสุดท้ายของวัน + ทั้งวันไม่มีข่าวเข้าเงื่อนไขเลยสักครั้ง -> สรุปให้ทราบ
         if is_last_run_hour and not state["had_news_today"] and not state["last_summary_sent_today"]:
-            send_telegram_message("🌙 ขอจบรายงานข่าวของวันนี้เท่านี้ครับ หลับฝันดี")
+            send_telegram_message("🌙 วันนี้ยังไม่มีข่าวอะไรใหม่")
             state["last_summary_sent_today"] = True
     else:
         print(f"พบข่าวใหม่ {len(new_items)} รายการ กำลังส่งเข้า Telegram...")
