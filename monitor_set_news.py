@@ -1,4 +1,4 @@
-"""
+จ"""
 ตรวจข่าวใหม่จากหน้า "ข่าวหลักทรัพย์" ของตลาดหลักทรัพย์แห่งประเทศไทย (SET)
 แล้วส่งแจ้งเตือนเข้า Telegram เมื่อพบข่าวที่ยังไม่เคยแจ้งมาก่อน
 
@@ -326,7 +326,7 @@ async def main():
 
         # รอบสุดท้ายของวัน + ทั้งวันไม่มีข่าวเข้าเงื่อนไขเลยสักครั้ง -> สรุปให้ทราบ
         if is_last_run_hour and not state["had_news_today"] and not state["last_summary_sent_today"]:
-            send_telegram_message("🌙 วันนี้ยังไม่มีข่าวอะไรใหม่")
+            send_telegram_message("🌙 ขอจบรายงานข่าวของวันนี้เท่านี้ครับ หลับฝันดี")
             state["last_summary_sent_today"] = True
     else:
         print(f"พบข่าวใหม่ {len(new_items)} รายการ กำลังส่งเข้า Telegram...")
