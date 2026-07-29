@@ -2,6 +2,6 @@
   "seen_ids": [],
   "date": "2026-07-29",
   "had_news_today": false,
-  "first_notified_today": false,
+  "first_notified_today": true,
   "last_summary_sent_today": false
 }
