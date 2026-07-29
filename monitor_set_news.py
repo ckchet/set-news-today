@@ -36,6 +36,10 @@ LINK_KEYS = ["url", "link", "newsUrl", "detailUrl"]
 CATEGORY_KEYS = ["newsType", "category", "type", "typeName", "newsCategory", "group"]
 SYMBOL_KEYS = ["symbol", "stockSymbol", "securitySymbol", "companySymbol", "ticker"]
 
+# endpoint ข่าวจริงของเว็บ SET ที่ยืนยันแล้วจาก DEBUG log (หน้า news-and-alert/news เรียก endpoint นี้)
+# ใช้จับคู่โดยตรงแทนการเดาโครงสร้าง เพื่อไม่ให้พลาดกรณี "วันนั้นไม่มีข่าวเลย" (list ว่างเปล่า)
+NEWS_ENDPOINT_HINT = "/api/cms/v1/news/set"
+
 # ==== ตั้งค่าหัวข้อข่าวที่สนใจ ====
 TOPIC_KEYWORDS = [
     "งบการเงิน",
@@ -58,6 +62,27 @@ SYMBOL_FILTER = [
 def log(*args):
     if DEBUG:
         print(*args, file=sys.stderr)
+
+
+def extract_list_from_known_endpoint(body):
+    """ดึง list ของข่าวออกจาก JSON body ของ endpoint ข่าวที่รู้จักแน่นอนแล้ว
+    รองรับกรณี list ว่างเปล่าด้วย (แปลว่าวันนั้นไม่มีข่าว ไม่ใช่ error)"""
+    if isinstance(body, list):
+        return body
+    if isinstance(body, dict):
+        wrapper_keys = ["data", "list", "items", "results", "securities", "newslist", "rows", "records", "news"]
+        for k, v in body.items():
+            if k.lower() in wrapper_keys and isinstance(v, list):
+                return v
+        # fallback: หา list ตัวแรกที่เจอในชั้นบนสุดหรือชั้นถัดไป (ไม่ว่างหรือว่างก็ได้)
+        for v in body.values():
+            if isinstance(v, list):
+                return v
+            if isinstance(v, dict):
+                for v2 in v.values():
+                    if isinstance(v2, list):
+                        return v2
+    return None
 
 
 def looks_like_news_item(d: dict) -> bool:
@@ -155,21 +180,49 @@ async def fetch_news_items():
 
         await browser.close()
 
+    # ขั้นแรก: ลองจับคู่กับ endpoint ข่าวที่รู้จักแน่นอนก่อน (แม่นยำกว่าการเดาโครงสร้าง)
+    matched_lists = []
+    for url, body in captured_jsons:
+        if NEWS_ENDPOINT_HINT in url:
+            lst = extract_list_from_known_endpoint(body)
+            if lst is not None:
+                log(f"พบ endpoint ข่าวที่รู้จัก: {url} -> {len(lst)} รายการ")
+                matched_lists.append(lst)
+
+    if matched_lists:
+        # รวมข่าวจากทุก endpoint ที่แมตช์ (เว็บอาจยิงหลาย request สำหรับหลายช่วงวันที่/ตัวกรอง) แล้วตัดรายการซ้ำ
+        merged = []
+        seen_ids_local = set()
+        for lst in matched_lists:
+            for item in lst:
+                if not isinstance(item, dict):
+                    continue
+                nid = make_news_id(item)
+                if nid not in seen_ids_local:
+                    seen_ids_local.add(nid)
+                    merged.append(item)
+        if merged:
+            log("ตัวอย่างรายการแรก (keys ทั้งหมด):", list(merged[0].keys()))
+            log("ตัวอย่างรายการแรก:", json.dumps(merged[0], ensure_ascii=False)[:800])
+        else:
+            log("พบ endpoint ข่าวที่รู้จัก แต่รวมแล้วไม่มีข่าวเลย (list ว่างทุกตัว) — ถือว่าดึงสำเร็จ แค่วันนี้ไม่มีข่าว")
+        return True, merged
+
+    # ขั้นสำรอง: ถ้าไม่เจอ endpoint ที่รู้จักเลย (เผื่อ URL เปลี่ยนไปในอนาคต) กลับไปใช้วิธีเดาโครงสร้างแบบเดิม
     all_candidates = []
     for url, body in captured_jsons:
         for path, lst in find_news_list(body):
             all_candidates.append((url, path, lst))
 
     if not all_candidates:
-        log("ไม่พบ JSON ที่หน้าตาเหมือนรายการข่าวเลยในบรรดา response ที่ดักจับได้ทั้งหมด")
-        return []
+        log("ไม่พบ JSON ที่หน้าตาเหมือนรายการข่าวเลยในบรรดา response ที่ดักจับได้ทั้งหมด "
+            "และไม่พบ endpoint ที่รู้จักด้วย (NEWS_ENDPOINT_HINT ไม่ตรงกับ URL ไหนเลย)")
+        return False, []
 
     all_candidates.sort(key=lambda x: len(x[2]), reverse=True)
     best_url, best_path, best_list = all_candidates[0]
-    log(f"เลือกใช้ list จาก {best_url} ({best_path}) จำนวน {len(best_list)} รายการ")
-    if best_list:
-        log("ตัวอย่างรายการแรก:", json.dumps(best_list[0], ensure_ascii=False)[:500])
-    return best_list
+    log(f"[fallback] เลือกใช้ list จาก {best_url} ({best_path}) จำนวน {len(best_list)} รายการ")
+    return True, best_list
 
 
 def load_state():
@@ -252,12 +305,14 @@ async def main():
     is_first_run_today = not state["first_notified_today"]
     is_last_run_hour = now_bkk.hour == LAST_RUN_HOUR
 
-    items = await fetch_news_items()
-    if not items:
-        print("ไม่พบรายการข่าว (ดู DEBUG log ถ้าต้องการตรวจสอบ)")
+    success, items = await fetch_news_items()
+    if not success:
+        print("ดึงรายการข่าวไม่ได้เลย (ดู DEBUG log ถ้าต้องการตรวจสอบ)")
         send_telegram_message("⚠️ ตรวจแล้ว แต่ดึงรายการข่าวจากเว็บ SET ไม่ได้เลย (อาจเป็นเพราะเว็บเปลี่ยนโครงสร้าง)")
         save_state(state)
         return
+    # ถ้า success=True แต่ items ว่างเปล่า แปลว่าดึงสำเร็จ เพียงแต่วันนี้ไม่มีข่าวใหม่ออกมาเลย
+    # ให้ทำงานต่อตามปกติ (ไปเข้าเงื่อนไข "ไม่มีข่าวใหม่" ด้านล่าง) ไม่ต้องแจ้งเตือนว่ามีปัญหา
 
     seen_ids = set(state.get("seen_ids", []))
 
