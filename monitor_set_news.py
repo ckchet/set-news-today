@@ -7,6 +7,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -57,6 +58,39 @@ SYMBOL_FILTER = [
     "LH", "MINT", "MTC", "OR", "OSP", "PTT", "PTTEP", "PTTGC", "RATCH", "SAWAD",
     "SCB", "SCC", "SCGP", "SIRI", "TIDLOR", "TISCO", "TOP", "TRUE", "TTB", "TU",
 ]
+
+# ==== วันหยุดตลาดหลักทรัพย์แห่งประเทศไทย (SET) ====
+# อ่านรายชื่อวันหยุดจากไฟล์ holidays.txt (แก้ไฟล์นั้นเพื่อเพิ่ม/ลบวันหยุด ไม่ต้องแตะโค้ดตรงนี้เลย)
+HOLIDAYS_FILE = Path(__file__).parent / "holidays.txt"
+
+# จับรูปแบบวันที่ YYYY-MM-DD ที่ต้นบรรทัด (ส่วนที่เหลือหลังวันที่ เช่น คำอธิบาย จะถูกมองข้าม)
+_DATE_PATTERN = re.compile(r"^(\d{4}-\d{2}-\d{2})")
+
+
+def load_holidays() -> set:
+    """อ่านรายชื่อวันหยุดจากไฟล์ holidays.txt (1 บรรทัดต่อ 1 วัน, บรรทัดที่ขึ้นต้นด้วย # คือคอมเมนต์)
+    ถ้าไฟล์หายหรืออ่านไม่ได้ ให้ถือว่าไม่มีวันหยุด (ไม่ทำให้บอทหยุดทำงานทั้งระบบ)"""
+    if not HOLIDAYS_FILE.exists():
+        log(f"ไม่พบไฟล์ {HOLIDAYS_FILE} ข้ามการเช็ควันหยุด")
+        return set()
+    try:
+        holidays = set()
+        for line in HOLIDAYS_FILE.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            m = _DATE_PATTERN.match(line)
+            if m:
+                holidays.add(m.group(1))
+        return holidays
+    except Exception as e:
+        log(f"อ่านไฟล์ {HOLIDAYS_FILE} ไม่สำเร็จ: {e} — ข้ามการเช็ควันหยุด")
+        return set()
+
+
+def is_holiday_today(now_bkk: datetime) -> bool:
+    """เช็คว่าวันนี้ (เวลาไทย) เป็นวันหยุดตลาดหลักทรัพย์หรือไม่ (อ่านจากไฟล์ holidays.txt)"""
+    return now_bkk.strftime("%Y-%m-%d") in load_holidays()
 
 
 def log(*args):
@@ -293,6 +327,14 @@ def format_message(item: dict) -> str:
 async def main():
     now_bkk = datetime.now(BANGKOK_TZ)
     today_str = now_bkk.strftime("%Y-%m-%d")
+
+    if is_holiday_today(now_bkk):
+        print(f"วันนี้ ({today_str}) เป็นวันหยุดตลาดหลักทรัพย์ ข้ามการทำงานทั้งหมด")
+        return
+
+    if now_bkk.weekday() >= 5:  # เสาร์(5)/อาทิตย์(6) - เผื่อกรณีมีคนกด "Run workflow" ทดสอบเองในวันหยุดสุดสัปดาห์
+        print(f"วันนี้ ({today_str}) เป็นวันเสาร์-อาทิตย์ ข้ามการทำงานทั้งหมด")
+        return
 
     state = load_state()
 
