@@ -1,9 +1,3 @@
 {
-  "seen_ids": [
-    "cbe5cfdf7c2118a9"
-  ],
-  "date": "2026-07-31",
-  "had_news_today": false,
-  "first_notified_today": true,
-  "last_summary_sent_today": false
+  "seen_ids": []
 }

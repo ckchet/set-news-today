@@ -30,11 +30,12 @@ BANGKOK_TZ = ZoneInfo("Asia/Bangkok")
 LAST_RUN_HOUR = 22  # ชั่วโมง (เวลาไทย) ของรอบทำงานสุดท้ายในแต่ละวัน ต้องตรงกับตารางใน .github/workflows/monitor.yml
 
 # คำใบ้ที่ใช้เดาว่า field ไหนคือ "หัวข้อข่าว" / "วันที่" / "รหัสข่าว" / "ลิงก์" / "ชื่อหุ้น"
-TITLE_KEYS = ["subject", "title", "header", "newsSubject", "headline", "name"]
-DATE_KEYS = ["datetime", "date", "newsDate", "publishDate", "createDate", "dateTime"]
-ID_KEYS = ["newsId", "id", "docId", "no", "seq"]
+# (ยืนยันจากข้อมูลจริงของเว็บ SET แล้วว่า field จริงคือ: id, datetime, symbol, headline, url, tag)
+TITLE_KEYS = ["headline", "subject", "title", "header", "newsSubject"]
+DATE_KEYS = ["datetime", "date", "newsDate", "publishDate", "createDate"]
+ID_KEYS = ["id", "newsId", "docId", "no", "seq"]
 LINK_KEYS = ["url", "link", "newsUrl", "detailUrl"]
-CATEGORY_KEYS = ["newsType", "category", "type", "typeName", "newsCategory", "group"]
+CATEGORY_KEYS = ["tag", "_group_label", "newsType", "category", "type", "typeName", "newsCategory", "group"]
 SYMBOL_KEYS = ["symbol", "stockSymbol", "securitySymbol", "companySymbol", "ticker"]
 
 # endpoint ข่าวจริงของเว็บ SET ที่ยืนยันแล้วจาก DEBUG log (หน้า news-and-alert/news เรียก endpoint นี้)
@@ -48,14 +49,6 @@ TOPIC_KEYWORDS = [
     "งบไตรมาส",
     "กำไรสุทธิ",
     "Earnings",
-    "คำอธิบายและวิเคราะห์",
-    "สรุปผลการดำเนินงาน",
-    "ปันผล",
-    "XD",
-    "หุ้นเพิ่มทุน",
-    "การใช้เงินเพิ่มทุน",
-    "หุ้นซื้อคืน",
-    "ชี้แจงข้อเท็จจริง",
 ]
 
 # หุ้นในลิสต์นี้จะได้รับ "ทุกข่าว" โดยไม่ต้องผ่าน TOPIC_KEYWORDS เลย ส่วนหุ้นอื่นยังต้องผ่านตัวกรองหัวข้อตามปกติ
@@ -64,11 +57,7 @@ SYMBOL_FILTER = [
     "CBG", "CENTEL", "COM7", "CPALL", "CPF", "CPN", "CRC", "DELTA", "EA", "EGCO",
     "GLOBAL", "GPSC", "GULF", "HMPRO", "INTUCH", "IVL", "JMART", "KBANK", "KTB", "KTC",
     "LH", "MINT", "MTC", "OR", "OSP", "PTT", "PTTEP", "PTTGC", "RATCH", "SAWAD",
-    "SCB", "SCC", "SCGP", "SIRI", "TIDLOR", "TISCO", "TOP", "TRUE", "TTB", "TU","TACC","KCG","NSL",
-    "SNP","AU","MAGURO","OKJ","XO","MC","SABINA","NEO","BLC","MEGA","MTC","SAK",
-    "TURBO","MEB","MOSHI","TOG","AURA","DOHOME","MRDIYT","ILM","ADVICE","HL","CPAXT",
-    "MOTHER","TNP","SVT","WASH","EKH","PR9","RPH","WPH","KLINIQ","KTMS","LTMH","PRTR","SISB","SPA",
-    "SAV","BOL","READY","HUMAN","ITC",
+    "SCB", "SCC", "SCGP", "SIRI", "TIDLOR", "TISCO", "TOP", "TRUE", "TTB", "TU",
 ]
 
 # ==== วันหยุดตลาดหลักทรัพย์แห่งประเทศไทย (SET) ====
@@ -112,23 +101,53 @@ def log(*args):
 
 def extract_list_from_known_endpoint(body):
     """ดึง list ของข่าวออกจาก JSON body ของ endpoint ข่าวที่รู้จักแน่นอนแล้ว
-    รองรับกรณี list ว่างเปล่าด้วย (แปลว่าวันนั้นไม่มีข่าว ไม่ใช่ error)"""
+    รองรับกรณี list ว่างเปล่าด้วย (แปลว่าวันนั้นไม่มีข่าว ไม่ใช่ error)
+
+    สำคัญ: โครงสร้างจริงของ SET คือ list ของ "กลุ่มข่าว" (เช่น {"group": "ข่าวงบการเงิน",
+    "totalCount": 5, "newsInfoList": [...ข่าวจริงแต่ละชิ้น...]}) ไม่ใช่ list ของข่าวตรงๆ
+    ฟังก์ชันนี้จึงต้อง "แตก" (flatten) newsInfoList ของแต่ละกลุ่มออกมาเป็นข่าวจริงทีละชิ้นก่อน
+    ถ้าไม่แตกออกมา จะเอา object กลุ่มไปนับเป็นข่าว 1 ชิ้นผิดๆ (ไม่มีหัวข้อ/วันที่/id จริง) ทำให้ข่าว
+    จริงข้างในถูกมองข้ามไปตลอดกาล
+    """
+    raw_list = None
     if isinstance(body, list):
-        return body
-    if isinstance(body, dict):
+        raw_list = body
+    elif isinstance(body, dict):
         wrapper_keys = ["data", "list", "items", "results", "securities", "newslist", "rows", "records", "news"]
         for k, v in body.items():
             if k.lower() in wrapper_keys and isinstance(v, list):
-                return v
-        # fallback: หา list ตัวแรกที่เจอในชั้นบนสุดหรือชั้นถัดไป (ไม่ว่างหรือว่างก็ได้)
-        for v in body.values():
-            if isinstance(v, list):
-                return v
-            if isinstance(v, dict):
-                for v2 in v.values():
-                    if isinstance(v2, list):
-                        return v2
-    return None
+                raw_list = v
+                break
+        if raw_list is None:
+            for v in body.values():
+                if isinstance(v, list):
+                    raw_list = v
+                    break
+                if isinstance(v, dict):
+                    for v2 in v.values():
+                        if isinstance(v2, list):
+                            raw_list = v2
+                            break
+                    if raw_list is not None:
+                        break
+
+    if raw_list is None:
+        return None
+
+    # แตก newsInfoList ของแต่ละ "กลุ่มข่าว" ออกมาเป็นข่าวจริงทีละชิ้น
+    flattened = []
+    for entry in raw_list:
+        if isinstance(entry, dict) and isinstance(entry.get("newsInfoList"), list):
+            group_label = entry.get("group")
+            for leaf in entry["newsInfoList"]:
+                if isinstance(leaf, dict):
+                    if group_label:
+                        leaf = {**leaf, "_group_label": group_label}
+                    flattened.append(leaf)
+        elif isinstance(entry, dict):
+            # เผื่อ endpoint บางตัว/บางช่วงเวลาไม่ได้ห่อด้วย group/newsInfoList (คืนข่าวมาตรงๆ)
+            flattened.append(entry)
+    return flattened
 
 
 def looks_like_news_item(d: dict) -> bool:
