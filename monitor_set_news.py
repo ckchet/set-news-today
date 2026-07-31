@@ -55,6 +55,7 @@ TOPIC_KEYWORDS = [
     "หุ้นเพิ่มทุน",
     "การใช้เงินเพิ่มทุน",
     "หุ้นซื้อคืน",
+    "ชี้แจงข้อเท็จจริง",
 ]
 
 # หุ้นในลิสต์นี้จะได้รับ "ทุกข่าว" โดยไม่ต้องผ่าน TOPIC_KEYWORDS เลย ส่วนหุ้นอื่นยังต้องผ่านตัวกรองหัวข้อตามปกติ
@@ -63,7 +64,11 @@ SYMBOL_FILTER = [
     "CBG", "CENTEL", "COM7", "CPALL", "CPF", "CPN", "CRC", "DELTA", "EA", "EGCO",
     "GLOBAL", "GPSC", "GULF", "HMPRO", "INTUCH", "IVL", "JMART", "KBANK", "KTB", "KTC",
     "LH", "MINT", "MTC", "OR", "OSP", "PTT", "PTTEP", "PTTGC", "RATCH", "SAWAD",
-    "SCB", "SCC", "SCGP", "SIRI", "TIDLOR", "TISCO", "TOP", "TRUE", "TTB", "TU",
+    "SCB", "SCC", "SCGP", "SIRI", "TIDLOR", "TISCO", "TOP", "TRUE", "TTB", "TU","TACC","KCG","NSL",
+    "SNP","AU","MAGURO","OKJ","XO","MC","SABINA","NEO","BLC","MEGA","MTC","SAK",
+    "TURBO","MEB","MOSHI","TOG","AURA","DOHOME","MRDIYT","ILM","ADVICE","HL","CPAXT",
+    "MOTHER","TNP","SVT","WASH","EKH","PR9","RPH","WPH","KLINIQ","KTMS","LTMH","PRTR","SISB","SPA",
+    "SAV","BOL","READY","HUMAN",
 ]
 
 # ==== วันหยุดตลาดหลักทรัพย์แห่งประเทศไทย (SET) ====
