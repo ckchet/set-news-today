@@ -45,10 +45,22 @@ NEWS_ENDPOINT_HINT = "/api/cms/v1/news/set"
 # ==== ตั้งค่าหัวข้อข่าวที่สนใจ ====
 TOPIC_KEYWORDS = [
     "งบการเงิน",
+    "งบการเงินรายปี",
     "ผลประกอบการ",
     "งบไตรมาส",
     "กำไรสุทธิ",
     "Earnings",
+    "คำอธิบายและวิเคราะห์",
+    "แจ้งเลิกกิจการ",
+    "แผนปรับโครงสร้างธุรกิจ",
+    "ชี้แจงข้อเท็จจริง",
+    "สรุปผลการดำเนินงานของ",
+    "จ่ายปันผล",
+    "รายงานประจำปี",
+    "แจ้งการจัดตั้งบริษัทย่อย",
+    "แจ้งการเลิกบริษัทย่อย",
+    "XD",
+    "แบบรายงานผลการซื้อหุ้นคืน",
 ]
 
 # หุ้นในลิสต์นี้จะได้รับ "ทุกข่าว" โดยไม่ต้องผ่าน TOPIC_KEYWORDS เลย ส่วนหุ้นอื่นยังต้องผ่านตัวกรองหัวข้อตามปกติ
@@ -57,7 +69,11 @@ SYMBOL_FILTER = [
     "CBG", "CENTEL", "COM7", "CPALL", "CPF", "CPN", "CRC", "DELTA", "EA", "EGCO",
     "GLOBAL", "GPSC", "GULF", "HMPRO", "INTUCH", "IVL", "JMART", "KBANK", "KTB", "KTC",
     "LH", "MINT", "MTC", "OR", "OSP", "PTT", "PTTEP", "PTTGC", "RATCH", "SAWAD",
-    "SCB", "SCC", "SCGP", "SIRI", "TIDLOR", "TISCO", "TOP", "TRUE", "TTB", "TU",
+    "SCB", "SCC", "SCGP", "SIRI", "TIDLOR", "TISCO", "TOP", "TRUE", "TTB", "TU","TACC","KCG","NSL",
+    "SNP","AU","MAGURO","OKJ","XO","MC","SABINA","NEO","BLC","MEGA","MTC","SAK",
+    "TURBO","MEB","MOSHI","TOG","AURA","DOHOME","MRDIYT","ILM","ADVICE","HL","CPAXT",
+    "MOTHER","TNP","SVT","WASH","EKH","PR9","RPH","WPH","KLINIQ","KTMS","LTMH","PRTR","SISB","SPA",
+    "SAV","BOL","READY","HUMAN","ITC",
 ]
 
 # ==== วันหยุดตลาดหลักทรัพย์แห่งประเทศไทย (SET) ====
