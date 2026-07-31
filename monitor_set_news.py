@@ -42,39 +42,28 @@ SYMBOL_KEYS = ["symbol", "stockSymbol", "securitySymbol", "companySymbol", "tick
 # ใช้จับคู่โดยตรงแทนการเดาโครงสร้าง เพื่อไม่ให้พลาดกรณี "วันนั้นไม่มีข่าวเลย" (list ว่างเปล่า)
 NEWS_ENDPOINT_HINT = "/api/cms/v1/news/set"
 
-# ==== ตั้งค่าหัวข้อข่าวที่สนใจ ====
-TOPIC_KEYWORDS = [
-    "งบการเงิน",
-    "งบการเงินรายปี",
-    "ผลประกอบการ",
-    "งบไตรมาส",
-    "กำไรสุทธิ",
-    "Earnings",
-    "คำอธิบายและวิเคราะห์",
-    "แจ้งเลิกกิจการ",
-    "แผนปรับโครงสร้างธุรกิจ",
-    "ชี้แจงข้อเท็จจริง",
-    "สรุปผลการดำเนินงานของ",
-    "จ่ายปันผล",
-    "รายงานประจำปี",
-    "แจ้งการจัดตั้งบริษัทย่อย",
-    "แจ้งการเลิกบริษัทย่อย",
-    "XD",
-    "แบบรายงานผลการซื้อหุ้นคืน",
-]
+# ==== ตั้งค่าหัวข้อข่าว/หุ้นที่สนใจ (อ่านจากไฟล์ .txt แยกต่างหาก ไม่ต้องแก้โค้ดตรงนี้) ====
+TOPIC_KEYWORDS_FILE = Path(__file__).parent / "topic_keywords.txt"
+SYMBOL_FILTER_FILE = Path(__file__).parent / "symbol_filter.txt"
 
-# หุ้นในลิสต์นี้จะได้รับ "ทุกข่าว" โดยไม่ต้องผ่าน TOPIC_KEYWORDS เลย ส่วนหุ้นอื่นยังต้องผ่านตัวกรองหัวข้อตามปกติ
-SYMBOL_FILTER = [
-    "ADVANC", "AOT", "AWC", "BANPU", "BBL", "BDMS", "BEM", "BGRIM", "BH", "BTS",
-    "CBG", "CENTEL", "COM7", "CPALL", "CPF", "CPN", "CRC", "DELTA", "EA", "EGCO",
-    "GLOBAL", "GPSC", "GULF", "HMPRO", "INTUCH", "IVL", "JMART", "KBANK", "KTB", "KTC",
-    "LH", "MINT", "MTC", "OR", "OSP", "PTT", "PTTEP", "PTTGC", "RATCH", "SAWAD",
-    "SCB", "SCC", "SCGP", "SIRI", "TIDLOR", "TISCO", "TOP", "TRUE", "TTB", "TU","TACC","KCG","NSL",
-    "SNP","AU","MAGURO","OKJ","XO","MC","SABINA","NEO","BLC","MEGA","MTC","SAK",
-    "TURBO","MEB","MOSHI","TOG","AURA","DOHOME","MRDIYT","ILM","ADVICE","HL","CPAXT",
-    "MOTHER","TNP","SVT","WASH","EKH","PR9","RPH","WPH","KLINIQ","KTMS","LTMH","PRTR","SISB","SPA",
-    "SAV","BOL","READY","HUMAN","ITC",
-]
+
+def load_lines_file(path: Path) -> list:
+    """อ่านไฟล์ .txt แบบ 1 บรรทัดต่อ 1 ค่า ข้ามบรรทัดว่างและบรรทัดที่ขึ้นต้นด้วย #
+    ถ้าไฟล์หายหรืออ่านไม่ได้ ให้คืนลิสต์ว่าง (ไม่ทำให้บอทพังทั้งระบบ)"""
+    if not path.exists():
+        log(f"ไม่พบไฟล์ {path} ใช้ค่าว่างแทน (ไม่กรอง)")
+        return []
+    try:
+        result = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            result.append(line)
+        return result
+    except Exception as e:
+        log(f"อ่านไฟล์ {path} ไม่สำเร็จ: {e} — ใช้ค่าว่างแทน")
+        return []
 
 # ==== วันหยุดตลาดหลักทรัพย์แห่งประเทศไทย (SET) ====
 # อ่านรายชื่อวันหยุดจากไฟล์ holidays.txt (แก้ไฟล์นั้นเพื่อเพิ่ม/ลบวันหยุด ไม่ต้องแตะโค้ดตรงนี้เลย)
@@ -206,16 +195,19 @@ def make_news_id(item: dict) -> str:
 
 
 def matches_topic_filter(item: dict) -> bool:
+    symbol_filter = load_lines_file(SYMBOL_FILTER_FILE)
+    topic_keywords = load_lines_file(TOPIC_KEYWORDS_FILE)
+
     symbol = str(extract_field(item, SYMBOL_KEYS) or "").upper()
 
-    if SYMBOL_FILTER and symbol in [s.upper() for s in SYMBOL_FILTER]:
+    if symbol_filter and symbol in [s.upper() for s in symbol_filter]:
         return True
 
-    if TOPIC_KEYWORDS:
+    if topic_keywords:
         title = str(extract_field(item, TITLE_KEYS) or "")
         category = str(extract_field(item, CATEGORY_KEYS) or "")
         haystack = f"{title} {category}".lower()
-        return any(kw.lower() in haystack for kw in TOPIC_KEYWORDS)
+        return any(kw.lower() in haystack for kw in topic_keywords)
 
     return True
 
