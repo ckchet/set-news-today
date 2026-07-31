@@ -68,7 +68,7 @@ SYMBOL_FILTER = [
     "SNP","AU","MAGURO","OKJ","XO","MC","SABINA","NEO","BLC","MEGA","MTC","SAK",
     "TURBO","MEB","MOSHI","TOG","AURA","DOHOME","MRDIYT","ILM","ADVICE","HL","CPAXT",
     "MOTHER","TNP","SVT","WASH","EKH","PR9","RPH","WPH","KLINIQ","KTMS","LTMH","PRTR","SISB","SPA",
-    "SAV","BOL","READY","HUMAN",
+    "SAV","BOL","READY","HUMAN","ITC",
 ]
 
 # ==== วันหยุดตลาดหลักทรัพย์แห่งประเทศไทย (SET) ====
