@@ -2,8 +2,7 @@ name: Monitor SET News to Telegram
 
 on:
   # ปิด native schedule ไว้ก่อน เพราะทำงานควบคู่กับ repository_dispatch (จาก cron-job.org) พร้อมกัน
-  # ทำให้เกิดการรันซ้อนกัน (concurrent runs) จนส่งข่าวซ้ำได้ ถ้าอยากเปิดกลับมาใช้คู่กัน
-  # ต้องตั้งเวลาให้ "ไม่ชนกัน" กับที่ตั้งไว้ใน cron-job.org เอง (ดูคำอธิบายใน README)
+  # ทำให้เกิดการรันซ้อนกัน (concurrent runs) จนส่งข่าวซ้ำได้
   # schedule:
   #   - cron: "7,37 23 * * 0-4"
   #   - cron: "7,37 0 * * 1-5"
@@ -11,14 +10,11 @@ on:
   #   - cron: "7,37 10-14 * * 1-5"
   #   - cron: "7 15 * * 1-5"
 
-  # ให้บริการ cron ภายนอก (cron-job.org) เรียก GitHub API มาสั่งรันตามเวลาที่ตั้งไว้
   repository_dispatch:
     types: [run-check]
 
   workflow_dispatch: {}   # ให้กดรันเองได้จากแท็บ Actions เพื่อทดสอบ
 
-# กันไม่ให้ workflow รันซ้อนกันเด็ดขาด (ถ้ามีคำสั่งใหม่เข้ามาระหว่างที่รอบเก่ายังไม่เสร็จ ให้ต่อคิวแทน)
-# นี่คือเกราะป้องกันชั้นสุดท้าย เผื่อมีการยิงคำสั่งมาถี่/ซ้อนกันโดยไม่ตั้งใจ
 concurrency:
   group: monitor-set-news
   cancel-in-progress: false
@@ -46,6 +42,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DEBUG: "1"
         run: python monitor_set_news.py
 
       - name: Commit updated state.json
@@ -54,6 +51,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add state.json
           git diff --cached --quiet || git commit -m "update state.json [skip ci]"
-          # ดึงการเปลี่ยนแปลงล่าสุดมา rebase ก่อน push เผื่อมี commit อื่นแซงเข้ามาระหว่างที่ job นี้กำลังรัน
           git pull --rebase origin "${{ github.ref_name }}"
           git push origin HEAD:"${{ github.ref_name }}"
