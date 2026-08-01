@@ -9,6 +9,7 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -324,23 +325,42 @@ def escape_html(text: str) -> str:
     )
 
 
-def send_telegram_message(text: str):
+def send_telegram_message(text: str, max_retries: int = 5):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         raise RuntimeError("ยังไม่ได้ตั้งค่า TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID")
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    resp = requests.post(
-        url,
-        data={
-            "chat_id": TELEGRAM_CHAT_ID,
-            "text": text,
-            "parse_mode": "HTML",
-            "disable_web_page_preview": False,
-        },
-        timeout=15,
-    )
-    if resp.status_code != 200:
+
+    for attempt in range(1, max_retries + 1):
+        resp = requests.post(
+            url,
+            data={
+                "chat_id": TELEGRAM_CHAT_ID,
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": False,
+            },
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            return
+
+        if resp.status_code == 429:
+            # โดน rate limit ของ Telegram (ส่งถี่เกินไป) — Telegram จะบอกมาว่าต้องรอกี่วินาทีใน retry_after
+            try:
+                retry_after = resp.json().get("parameters", {}).get("retry_after", 5)
+            except Exception:
+                retry_after = 5
+            wait_seconds = int(retry_after) + 1
+            print(f"Telegram rate limit (429) — รอ {wait_seconds} วินาทีแล้วลองส่งใหม่ "
+                  f"(ครั้งที่ {attempt}/{max_retries})", file=sys.stderr)
+            time.sleep(wait_seconds)
+            continue
+
+        # error อื่นๆ ที่ไม่ใช่ rate limit ให้โชว์รายละเอียดแล้วหยุดลองทันที (ไม่ retry เพราะไม่ช่วยอะไร)
         print(f"Telegram API error response: {resp.text}", file=sys.stderr)
-    resp.raise_for_status()
+        resp.raise_for_status()
+
+    raise RuntimeError(f"ส่งข้อความเข้า Telegram ไม่สำเร็จหลังลอง {max_retries} ครั้ง (โดน rate limit ต่อเนื่อง)")
 
 
 def format_message(item: dict) -> str:
@@ -412,17 +432,30 @@ async def main():
         if is_last_run_hour and not state["had_news_today"] and not state["last_summary_sent_today"]:
             send_telegram_message("🌙 วันนี้ยังไม่มีข่าวอะไรใหม่")
             state["last_summary_sent_today"] = True
-    else:
-        print(f"พบข่าวใหม่ {len(new_items)} รายการ กำลังส่งเข้า Telegram...")
+        state["first_notified_today"] = True
+        state["seen_ids"] = list(dict.fromkeys(current_ids + list(seen_ids)))[:500]
+        save_state(state)
+        return
+
+    print(f"พบข่าวใหม่ {len(new_items)} รายการ กำลังส่งเข้า Telegram...")
+    sent_count = 0
+    try:
+        # ส่งจากเก่าไปใหม่ จะได้เรียงลำดับใน Telegram สวยงาม
         for nid, item in reversed(new_items):
             send_telegram_message(format_message(item))
-        state["had_news_today"] = True
-
-    state["first_notified_today"] = True
-
-    updated_ids = list(dict.fromkeys(current_ids + list(seen_ids)))[:500]
-    state["seen_ids"] = updated_ids
-    save_state(state)
+            sent_count += 1
+            seen_ids.add(nid)
+            # บันทึกความคืบหน้าทันทีหลังส่งสำเร็จแต่ละข่าว — ถ้าเกิด error กลางทาง (เช่น rate limit)
+            # ข่าวที่ส่งสำเร็จไปแล้วจะไม่ถูกส่งซ้ำอีกในรอบถัดไป มีแต่ข่าวที่ยังไม่ทันส่งเท่านั้นที่จะลองใหม่
+            state["had_news_today"] = True
+            state["first_notified_today"] = True
+            state["seen_ids"] = list(dict.fromkeys(current_ids + list(seen_ids)))[:500]
+            save_state(state)
+            time.sleep(2)  # หน่วงเวลาระหว่างข้อความ กันโดน Telegram rate limit (429) — กลุ่มมีข้อจำกัดเข้มงวดกว่าแชทเดี่ยว
+    except Exception:
+        print(f"ส่งข่าวสำเร็จไปแล้ว {sent_count}/{len(new_items)} รายการ ก่อนเกิด error "
+              f"(ข่าวที่ส่งสำเร็จแล้วจะไม่ถูกส่งซ้ำในรอบถัดไป ส่วนที่เหลือจะลองใหม่ในรอบหน้า)", file=sys.stderr)
+        raise
 
 
 if __name__ == "__main__":
