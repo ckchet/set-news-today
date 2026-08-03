@@ -1,3 +1,9 @@
 {
-  "seen_ids": []
+  "seen_ids": [
+    "105598401"
+  ],
+  "date": "2026-08-03",
+  "had_news_today": true,
+  "first_notified_today": true,
+  "last_summary_sent_today": false
 }
