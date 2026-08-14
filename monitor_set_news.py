@@ -1,6 +1,12 @@
 """
 ตรวจข่าวใหม่จากหน้า "ข่าวหลักทรัพย์" ของตลาดหลักทรัพย์แห่งประเทศไทย (SET)
 แล้วส่งแจ้งเตือนเข้า Telegram เมื่อพบข่าวที่ยังไม่เคยแจ้งมาก่อน
+
+เงื่อนไขการกรองข่าว (แก้ไขในไฟล์ .txt ได้เลย ไม่ต้องแตะโค้ด):
+- symbol_filter.txt: รายชื่อหุ้นที่สนใจ ต้องเป็นหุ้นในลิสต์นี้เท่านั้นถึงจะพิจารณาส่ง
+- topic_keywords.txt: คำที่ต้องมีในหัวข้อ/ประเภทข่าว ต้องตรงคำใดคำหนึ่งด้วยถึงจะส่ง
+- ทั้งสองเงื่อนไขเป็น "AND" กัน คือต้องผ่านทั้งคู่ ข่าวถึงจะถูกส่งเข้า Telegram
+- holidays.txt: วันที่ระบุไว้ในนี้ บอทจะไม่ทำงานเลยทั้งวัน
 """
 
 import asyncio
@@ -23,8 +29,7 @@ STATE_FILE = Path(__file__).parent / "state.json"
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
-# เปิดไว้ถาวรชั่วคราวเพื่อวินิจฉัยปัญหา "ดึงข่าวไม่ได้" — log จะโชว์รายละเอียด endpoint ที่ดักจับได้ทั้งหมด
-# ดู log ได้ที่ tab Actions -> เลือก run ล่าสุด -> ขั้นตอน "Run monitor script"
+# เปิดไว้ถาวรชั่วคราวเพื่อวินิจฉัยปัญหา — log จะโชว์รายละเอียด endpoint ที่ดักจับได้ทั้งหมด
 DEBUG = os.environ.get("DEBUG", "1") == "1"
 
 BANGKOK_TZ = ZoneInfo("Asia/Bangkok")
@@ -39,13 +44,21 @@ LINK_KEYS = ["url", "link", "newsUrl", "detailUrl"]
 CATEGORY_KEYS = ["tag", "_group_label", "newsType", "category", "type", "typeName", "newsCategory", "group"]
 SYMBOL_KEYS = ["symbol", "stockSymbol", "securitySymbol", "companySymbol", "ticker"]
 
-# endpoint ข่าวจริงของเว็บ SET ที่ยืนยันแล้วจาก DEBUG log (หน้า news-and-alert/news เรียก endpoint นี้)
-# ใช้จับคู่โดยตรงแทนการเดาโครงสร้าง เพื่อไม่ให้พลาดกรณี "วันนั้นไม่มีข่าวเลย" (list ว่างเปล่า)
+# endpoint ข่าวจริงของเว็บ SET ที่ยืนยันแล้วจาก DEBUG log
 NEWS_ENDPOINT_HINT = "/api/cms/v1/news/set"
 
 # ==== ตั้งค่าหัวข้อข่าว/หุ้นที่สนใจ (อ่านจากไฟล์ .txt แยกต่างหาก ไม่ต้องแก้โค้ดตรงนี้) ====
 TOPIC_KEYWORDS_FILE = Path(__file__).parent / "topic_keywords.txt"
 SYMBOL_FILTER_FILE = Path(__file__).parent / "symbol_filter.txt"
+
+# ==== วันหยุดตลาดหลักทรัพย์ (อ่านจากไฟล์ holidays.txt) ====
+HOLIDAYS_FILE = Path(__file__).parent / "holidays.txt"
+_DATE_PATTERN = re.compile(r"^(\d{4}-\d{2}-\d{2})")
+
+
+def log(*args):
+    if DEBUG:
+        print(*args, file=sys.stderr)
 
 
 def load_lines_file(path: Path) -> list:
@@ -66,17 +79,9 @@ def load_lines_file(path: Path) -> list:
         log(f"อ่านไฟล์ {path} ไม่สำเร็จ: {e} — ใช้ค่าว่างแทน")
         return []
 
-# ==== วันหยุดตลาดหลักทรัพย์แห่งประเทศไทย (SET) ====
-# อ่านรายชื่อวันหยุดจากไฟล์ holidays.txt (แก้ไฟล์นั้นเพื่อเพิ่ม/ลบวันหยุด ไม่ต้องแตะโค้ดตรงนี้เลย)
-HOLIDAYS_FILE = Path(__file__).parent / "holidays.txt"
-
-# จับรูปแบบวันที่ YYYY-MM-DD ที่ต้นบรรทัด (ส่วนที่เหลือหลังวันที่ เช่น คำอธิบาย จะถูกมองข้าม)
-_DATE_PATTERN = re.compile(r"^(\d{4}-\d{2}-\d{2})")
-
 
 def load_holidays() -> set:
-    """อ่านรายชื่อวันหยุดจากไฟล์ holidays.txt (1 บรรทัดต่อ 1 วัน, บรรทัดที่ขึ้นต้นด้วย # คือคอมเมนต์)
-    ถ้าไฟล์หายหรืออ่านไม่ได้ ให้ถือว่าไม่มีวันหยุด (ไม่ทำให้บอทหยุดทำงานทั้งระบบ)"""
+    """อ่านรายชื่อวันหยุดจากไฟล์ holidays.txt (1 บรรทัดต่อ 1 วัน, บรรทัดที่ขึ้นต้นด้วย # คือคอมเมนต์)"""
     if not HOLIDAYS_FILE.exists():
         log(f"ไม่พบไฟล์ {HOLIDAYS_FILE} ข้ามการเช็ควันหยุด")
         return set()
@@ -96,64 +101,7 @@ def load_holidays() -> set:
 
 
 def is_holiday_today(now_bkk: datetime) -> bool:
-    """เช็คว่าวันนี้ (เวลาไทย) เป็นวันหยุดตลาดหลักทรัพย์หรือไม่ (อ่านจากไฟล์ holidays.txt)"""
     return now_bkk.strftime("%Y-%m-%d") in load_holidays()
-
-
-def log(*args):
-    if DEBUG:
-        print(*args, file=sys.stderr)
-
-
-def extract_list_from_known_endpoint(body):
-    """ดึง list ของข่าวออกจาก JSON body ของ endpoint ข่าวที่รู้จักแน่นอนแล้ว
-    รองรับกรณี list ว่างเปล่าด้วย (แปลว่าวันนั้นไม่มีข่าว ไม่ใช่ error)
-
-    สำคัญ: โครงสร้างจริงของ SET คือ list ของ "กลุ่มข่าว" (เช่น {"group": "ข่าวงบการเงิน",
-    "totalCount": 5, "newsInfoList": [...ข่าวจริงแต่ละชิ้น...]}) ไม่ใช่ list ของข่าวตรงๆ
-    ฟังก์ชันนี้จึงต้อง "แตก" (flatten) newsInfoList ของแต่ละกลุ่มออกมาเป็นข่าวจริงทีละชิ้นก่อน
-    ถ้าไม่แตกออกมา จะเอา object กลุ่มไปนับเป็นข่าว 1 ชิ้นผิดๆ (ไม่มีหัวข้อ/วันที่/id จริง) ทำให้ข่าว
-    จริงข้างในถูกมองข้ามไปตลอดกาล
-    """
-    raw_list = None
-    if isinstance(body, list):
-        raw_list = body
-    elif isinstance(body, dict):
-        wrapper_keys = ["data", "list", "items", "results", "securities", "newslist", "rows", "records", "news"]
-        for k, v in body.items():
-            if k.lower() in wrapper_keys and isinstance(v, list):
-                raw_list = v
-                break
-        if raw_list is None:
-            for v in body.values():
-                if isinstance(v, list):
-                    raw_list = v
-                    break
-                if isinstance(v, dict):
-                    for v2 in v.values():
-                        if isinstance(v2, list):
-                            raw_list = v2
-                            break
-                    if raw_list is not None:
-                        break
-
-    if raw_list is None:
-        return None
-
-    # แตก newsInfoList ของแต่ละ "กลุ่มข่าว" ออกมาเป็นข่าวจริงทีละชิ้น
-    flattened = []
-    for entry in raw_list:
-        if isinstance(entry, dict) and isinstance(entry.get("newsInfoList"), list):
-            group_label = entry.get("group")
-            for leaf in entry["newsInfoList"]:
-                if isinstance(leaf, dict):
-                    if group_label:
-                        leaf = {**leaf, "_group_label": group_label}
-                    flattened.append(leaf)
-        elif isinstance(entry, dict):
-            # เผื่อ endpoint บางตัว/บางช่วงเวลาไม่ได้ห่อด้วย group/newsInfoList (คืนข่าวมาตรงๆ)
-            flattened.append(entry)
-    return flattened
 
 
 def looks_like_news_item(d: dict) -> bool:
@@ -196,21 +144,73 @@ def make_news_id(item: dict) -> str:
 
 
 def matches_topic_filter(item: dict) -> bool:
+    """ต้องผ่านทั้ง 2 เงื่อนไข (AND) ถึงจะส่งเข้า Telegram:
+    1. ต้องเป็นหุ้นที่อยู่ใน symbol_filter.txt (ถ้าไฟล์นั้นว่างเปล่า = ไม่จำกัดหุ้น)
+    2. หัวข้อ/ประเภทข่าวต้องมีคำใดคำหนึ่งใน topic_keywords.txt (ถ้าไฟล์นั้นว่างเปล่า = ไม่จำกัดหัวข้อ)
+    """
     symbol_filter = load_lines_file(SYMBOL_FILTER_FILE)
     topic_keywords = load_lines_file(TOPIC_KEYWORDS_FILE)
 
-    symbol = str(extract_field(item, SYMBOL_KEYS) or "").upper()
-
-    if symbol_filter and symbol in [s.upper() for s in symbol_filter]:
-        return True
+    if symbol_filter:
+        symbol = str(extract_field(item, SYMBOL_KEYS) or "").upper()
+        if symbol not in [s.upper() for s in symbol_filter]:
+            return False  # ไม่ใช่หุ้นที่สนใจ ไม่ส่ง
 
     if topic_keywords:
         title = str(extract_field(item, TITLE_KEYS) or "")
         category = str(extract_field(item, CATEGORY_KEYS) or "")
         haystack = f"{title} {category}".lower()
-        return any(kw.lower() in haystack for kw in topic_keywords)
+        if not any(kw.lower() in haystack for kw in topic_keywords):
+            return False  # หัวข้อไม่ตรงเงื่อนไข ไม่ส่ง
 
     return True
+
+
+def extract_list_from_known_endpoint(body):
+    """ดึง list ของข่าวออกจาก JSON body ของ endpoint ข่าวที่รู้จักแน่นอนแล้ว
+    รองรับกรณี list ว่างเปล่าด้วย (แปลว่าวันนั้นไม่มีข่าว ไม่ใช่ error)
+
+    สำคัญ: โครงสร้างจริงของ SET คือ list ของ "กลุ่มข่าว" (เช่น {"group": "ข่าวงบการเงิน",
+    "totalCount": 5, "newsInfoList": [...ข่าวจริงแต่ละชิ้น...]}) ไม่ใช่ list ของข่าวตรงๆ
+    ฟังก์ชันนี้จึงต้อง "แตก" (flatten) newsInfoList ของแต่ละกลุ่มออกมาเป็นข่าวจริงทีละชิ้นก่อน
+    """
+    raw_list = None
+    if isinstance(body, list):
+        raw_list = body
+    elif isinstance(body, dict):
+        wrapper_keys = ["data", "list", "items", "results", "securities", "newslist", "rows", "records", "news"]
+        for k, v in body.items():
+            if k.lower() in wrapper_keys and isinstance(v, list):
+                raw_list = v
+                break
+        if raw_list is None:
+            for v in body.values():
+                if isinstance(v, list):
+                    raw_list = v
+                    break
+                if isinstance(v, dict):
+                    for v2 in v.values():
+                        if isinstance(v2, list):
+                            raw_list = v2
+                            break
+                    if raw_list is not None:
+                        break
+
+    if raw_list is None:
+        return None
+
+    flattened = []
+    for entry in raw_list:
+        if isinstance(entry, dict) and isinstance(entry.get("newsInfoList"), list):
+            group_label = entry.get("group")
+            for leaf in entry["newsInfoList"]:
+                if isinstance(leaf, dict):
+                    if group_label:
+                        leaf = {**leaf, "_group_label": group_label}
+                    flattened.append(leaf)
+        elif isinstance(entry, dict):
+            flattened.append(entry)
+    return flattened
 
 
 async def fetch_news_items():
@@ -238,7 +238,6 @@ async def fetch_news_items():
             await page.goto(PAGE_URL, wait_until="networkidle", timeout=60000)
         except Exception as e:
             log(f"page.goto ล้มเหลว/timeout: {e}")
-            # ลองอีกครั้งด้วยเงื่อนไขที่ผ่อนปรนกว่า เผื่อหน้ามีการยิง request ต่อเนื่องไม่หยุด
             try:
                 await page.goto(PAGE_URL, wait_until="domcontentloaded", timeout=60000)
                 await page.wait_for_timeout(8000)
@@ -254,7 +253,6 @@ async def fetch_news_items():
 
         await browser.close()
 
-    # ขั้นแรก: ลองจับคู่กับ endpoint ข่าวที่รู้จักแน่นอนก่อน (แม่นยำกว่าการเดาโครงสร้าง)
     matched_lists = []
     for url, body in captured_jsons:
         if NEWS_ENDPOINT_HINT in url:
@@ -264,7 +262,6 @@ async def fetch_news_items():
                 matched_lists.append(lst)
 
     if matched_lists:
-        # รวมข่าวจากทุก endpoint ที่แมตช์ (เว็บอาจยิงหลาย request สำหรับหลายช่วงวันที่/ตัวกรอง) แล้วตัดรายการซ้ำ
         merged = []
         seen_ids_local = set()
         for lst in matched_lists:
@@ -279,18 +276,16 @@ async def fetch_news_items():
             log("ตัวอย่างรายการแรก (keys ทั้งหมด):", list(merged[0].keys()))
             log("ตัวอย่างรายการแรก:", json.dumps(merged[0], ensure_ascii=False)[:800])
         else:
-            log("พบ endpoint ข่าวที่รู้จัก แต่รวมแล้วไม่มีข่าวเลย (list ว่างทุกตัว) — ถือว่าดึงสำเร็จ แค่วันนี้ไม่มีข่าว")
+            log("พบ endpoint ข่าวที่รู้จัก แต่รวมแล้วไม่มีข่าวเลย — ถือว่าดึงสำเร็จ แค่วันนี้ไม่มีข่าว")
         return True, merged
 
-    # ขั้นสำรอง: ถ้าไม่เจอ endpoint ที่รู้จักเลย (เผื่อ URL เปลี่ยนไปในอนาคต) กลับไปใช้วิธีเดาโครงสร้างแบบเดิม
     all_candidates = []
     for url, body in captured_jsons:
         for path, lst in find_news_list(body):
             all_candidates.append((url, path, lst))
 
     if not all_candidates:
-        log("ไม่พบ JSON ที่หน้าตาเหมือนรายการข่าวเลยในบรรดา response ที่ดักจับได้ทั้งหมด "
-            "และไม่พบ endpoint ที่รู้จักด้วย (NEWS_ENDPOINT_HINT ไม่ตรงกับ URL ไหนเลย)")
+        log("ไม่พบ JSON ที่หน้าตาเหมือนรายการข่าวเลย และไม่พบ endpoint ที่รู้จักด้วย")
         return False, []
 
     all_candidates.sort(key=lambda x: len(x[2]), reverse=True)
@@ -345,7 +340,6 @@ def send_telegram_message(text: str, max_retries: int = 5):
             return
 
         if resp.status_code == 429:
-            # โดน rate limit ของ Telegram (ส่งถี่เกินไป) — Telegram จะบอกมาว่าต้องรอกี่วินาทีใน retry_after
             try:
                 retry_after = resp.json().get("parameters", {}).get("retry_after", 5)
             except Exception:
@@ -356,7 +350,6 @@ def send_telegram_message(text: str, max_retries: int = 5):
             time.sleep(wait_seconds)
             continue
 
-        # error อื่นๆ ที่ไม่ใช่ rate limit ให้โชว์รายละเอียดแล้วหยุดลองทันที (ไม่ retry เพราะไม่ช่วยอะไร)
         print(f"Telegram API error response: {resp.text}", file=sys.stderr)
         resp.raise_for_status()
 
@@ -391,7 +384,7 @@ async def main():
         print(f"วันนี้ ({today_str}) เป็นวันหยุดตลาดหลักทรัพย์ ข้ามการทำงานทั้งหมด")
         return
 
-    if now_bkk.weekday() >= 5:  # เสาร์(5)/อาทิตย์(6) - เผื่อกรณีมีคนกด "Run workflow" ทดสอบเองในวันหยุดสุดสัปดาห์
+    if now_bkk.weekday() >= 5:
         print(f"วันนี้ ({today_str}) เป็นวันเสาร์-อาทิตย์ ข้ามการทำงานทั้งหมด")
         return
 
@@ -412,8 +405,6 @@ async def main():
         send_telegram_message("⚠️ ตรวจแล้ว แต่ดึงรายการข่าวจากเว็บ SET ไม่ได้เลย (อาจเป็นเพราะเว็บเปลี่ยนโครงสร้าง)")
         save_state(state)
         return
-    # ถ้า success=True แต่ items ว่างเปล่า แปลว่าดึงสำเร็จ เพียงแต่วันนี้ไม่มีข่าวใหม่ออกมาเลย
-    # ให้ทำงานต่อตามปกติ (ไปเข้าเงื่อนไข "ไม่มีข่าวใหม่" ด้านล่าง) ไม่ต้องแจ้งเตือนว่ามีปัญหา
 
     seen_ids = set(state.get("seen_ids", []))
 
@@ -440,18 +431,15 @@ async def main():
     print(f"พบข่าวใหม่ {len(new_items)} รายการ กำลังส่งเข้า Telegram...")
     sent_count = 0
     try:
-        # ส่งจากเก่าไปใหม่ จะได้เรียงลำดับใน Telegram สวยงาม
         for nid, item in reversed(new_items):
             send_telegram_message(format_message(item))
             sent_count += 1
             seen_ids.add(nid)
-            # บันทึกความคืบหน้าทันทีหลังส่งสำเร็จแต่ละข่าว — ถ้าเกิด error กลางทาง (เช่น rate limit)
-            # ข่าวที่ส่งสำเร็จไปแล้วจะไม่ถูกส่งซ้ำอีกในรอบถัดไป มีแต่ข่าวที่ยังไม่ทันส่งเท่านั้นที่จะลองใหม่
             state["had_news_today"] = True
             state["first_notified_today"] = True
             state["seen_ids"] = list(dict.fromkeys(current_ids + list(seen_ids)))[:500]
             save_state(state)
-            time.sleep(2)  # หน่วงเวลาระหว่างข้อความ กันโดน Telegram rate limit (429) — กลุ่มมีข้อจำกัดเข้มงวดกว่าแชทเดี่ยว
+            time.sleep(2)
     except Exception:
         print(f"ส่งข่าวสำเร็จไปแล้ว {sent_count}/{len(new_items)} รายการ ก่อนเกิด error "
               f"(ข่าวที่ส่งสำเร็จแล้วจะไม่ถูกส่งซ้ำในรอบถัดไป ส่วนที่เหลือจะลองใหม่ในรอบหน้า)", file=sys.stderr)
