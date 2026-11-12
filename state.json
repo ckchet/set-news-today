@@ -1,6 +1,17 @@
 {
   "seen_ids": [
     "107658601",
+    "17944398065301",
+    "17944398064761",
+    "17944398064481",
+    "17944398064471",
+    "17944398064351",
+    "17944398064181",
+    "17944398063991",
+    "17944398063351",
+    "17944398063261",
+    "17944398063151",
+    "17944398063071",
     "17944398062671",
     "17944398062421",
     "17944398061901",
@@ -174,6 +185,28 @@
     "17944397932821",
     "17944397932221",
     "17944397930811",
+    "107792601",
+    "107780201",
+    "107791101",
+    "107789801",
+    "107759001",
+    "107686501",
+    "107683601",
+    "107675701",
+    "107789901",
+    "107787901",
+    "107767901",
+    "107763701",
+    "107791601",
+    "107791401",
+    "107671901",
+    "107790201",
+    "107755101",
+    "107754901",
+    "107789501",
+    "107788801",
+    "107781801",
+    "107757801",
     "107779801",
     "107788601",
     "107620801",
@@ -410,8 +443,8 @@
     "107716401",
     "107707501",
     "107733101",
-    "107744501",
     "107718101",
+    "107744501",
     "107744201",
     "107688901",
     "107715901",
@@ -466,333 +499,11 @@
     "107707801",
     "107710801",
     "107687801",
-    "107726701",
-    "107598601",
-    "107598401",
-    "107727501",
-    "107693701",
-    "107694601",
-    "107715501",
-    "107715401",
-    "107727901",
-    "107686201",
-    "107682801",
-    "107672201",
-    "107558401",
-    "107720201",
-    "107667701",
-    "107669301",
-    "107727101",
-    "107663501",
-    "107716801",
-    "107725701",
-    "107718901",
-    "107716901",
-    "107726501",
-    "107685701",
-    "107563201",
-    "107723301",
-    "107700001",
-    "107699601",
-    "107552501",
-    "107700901",
-    "107725001",
-    "107678501",
-    "107706901",
-    "107700801"
+    "107726701"
   ],
   "date": "2026-11-12",
   "had_news_today": true,
   "first_notified_today": true,
   "last_summary_sent_today": false,
-  "pending_push": [
-    {
-      "item": {
-        "source_id": "107620801",
-        "symbol": "KLINIQ",
-        "title": "คำอธิบายและวิเคราะห์ของฝ่ายจัดการ ไตรมาสที่ 3 สิ้นสุดวันที่ 30 ก.ย. 2569",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107620801&symbol=KLINIQ",
-        "published_at": "2026-11-12T19:35:10+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107620101",
-        "symbol": "KLINIQ",
-        "title": "สรุปผลการดำเนินงานของ บจ. ไตรมาสที่ 3 (F45) (สอบทานแล้ว)",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107620101&symbol=KLINIQ",
-        "published_at": "2026-11-12T19:35:00+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107757701",
-        "symbol": "PLANB",
-        "title": "คำอธิบายและบทวิเคราะห์ของฝ่ายบริหาร สำหรับผลประกอบการไตรมาส 3 ปี 2569 และงวดเก้าเดือนปี 2569",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107757701&symbol=PLANB",
-        "published_at": "2026-11-12T19:31:03+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107756801",
-        "symbol": "PLANB",
-        "title": "สรุปผลการดำเนินงานของ บจ. ไตรมาสที่ 3 (F45) (สอบทานแล้ว)",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107756801&symbol=PLANB",
-        "published_at": "2026-11-12T19:30:45+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107786601",
-        "symbol": "CENTEL",
-        "title": "คำอธิบายและวิเคราะห์ของฝ่ายจัดการ ไตรมาสที่ 3 สิ้นสุดวันที่ 30 ก.ย. 2569  (แก้ไข)",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107786601&symbol=CENTEL",
-        "published_at": "2026-11-12T19:24:52+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107770601",
-        "symbol": "PRTR",
-        "title": "คำอธิบายและวิเคราะห์ของฝ่ายจัดการ ไตรมาสที่ 3 สิ้นสุดวันที่ 30 ก.ย. 2569",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107770601&symbol=PRTR",
-        "published_at": "2026-11-12T19:24:42+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107770001",
-        "symbol": "PRTR",
-        "title": "สรุปผลการดำเนินงานของ บจ. ไตรมาสที่ 3 (F45) (สอบทานแล้ว)",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107770001&symbol=PRTR",
-        "published_at": "2026-11-12T19:24:13+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107783501",
-        "symbol": "CENTEL",
-        "title": "สรุปผลการดำเนินงานของ บจ. ไตรมาสที่ 3 (F45) (สอบทานแล้ว)",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107783501&symbol=CENTEL",
-        "published_at": "2026-11-12T19:20:14+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107783601",
-        "symbol": "CENTEL",
-        "title": "คำอธิบายและวิเคราะห์ของฝ่ายจัดการ ไตรมาสที่ 3 สิ้นสุดวันที่ 30 ก.ย. 2569",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107783601&symbol=CENTEL",
-        "published_at": "2026-11-12T19:17:10+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107689501",
-        "symbol": "CPF",
-        "title": "สรุปผลการดำเนินงานของ บจ. ไตรมาสที่ 3 (F45) (สอบทานแล้ว)",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107689501&symbol=CPF",
-        "published_at": "2026-11-12T17:01:40+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107703701",
-        "symbol": "SVOA",
-        "title": "คำอธิบายและวิเคราะห์ของฝ่ายจัดการ ไตรมาสที่ 3 สิ้นสุดวันที่ 30 ก.ย. 2569",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107703701&symbol=SVOA",
-        "published_at": "2026-11-12T17:01:33+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107703601",
-        "symbol": "SVOA",
-        "title": "สรุปผลการดำเนินงานของ บจ. ไตรมาสที่ 3 (F45) (สอบทานแล้ว)",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107703601&symbol=SVOA",
-        "published_at": "2026-11-12T17:01:05+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107661901",
-        "symbol": "AP",
-        "title": "คำอธิบายและวิเคราะห์ของฝ่ายจัดการ ไตรมาสที่ 3 สิ้นสุดวันที่ 30 ก.ย. 2569",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107661901&symbol=AP",
-        "published_at": "2026-11-12T12:42:38+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107672601",
-        "symbol": "MINT",
-        "title": "คำอธิบายและวิเคราะห์ของฝ่ายจัดการ ไตรมาสที่ 3 สิ้นสุดวันที่ 30 ก.ย. 2569",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107672601&symbol=MINT",
-        "published_at": "2026-11-12T12:39:59+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107672501",
-        "symbol": "MINT",
-        "title": "สรุปผลการดำเนินงานของ บจ. ไตรมาสที่ 3 (F45) (สอบทานแล้ว)",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107672501&symbol=MINT",
-        "published_at": "2026-11-12T12:39:21+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107669701",
-        "symbol": "GFPT",
-        "title": "คำอธิบายและวิเคราะห์ของฝ่ายจัดการ ไตรมาสที่ 3 สิ้นสุดวันที่ 30 ก.ย. 2569",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107669701&symbol=GFPT",
-        "published_at": "2026-11-12T12:38:47+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107656301",
-        "symbol": "GFPT",
-        "title": "สรุปผลการดำเนินงานของ บจ. ไตรมาสที่ 3 (F45) (สอบทานแล้ว)",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107656301&symbol=GFPT",
-        "published_at": "2026-11-12T12:38:24+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107674701",
-        "symbol": "AP",
-        "title": "สรุปผลการดำเนินงานของ บจ. ไตรมาสที่ 3 (F45) (สอบทานแล้ว)",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107674701&symbol=AP",
-        "published_at": "2026-11-12T12:37:11+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107563701",
-        "symbol": "KKP",
-        "title": "คำอธิบายและวิเคราะห์ของฝ่ายจัดการ ไตรมาสที่ 3 สิ้นสุดวันที่ 30 ก.ย. 2569",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107563701&symbol=KKP",
-        "published_at": "2026-11-12T12:33:21+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107564301",
-        "symbol": "KKP",
-        "title": "สรุปผลการดำเนินงานของ บจ. ไตรมาสที่ 3 (F45) (สอบทานแล้ว)",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107564301&symbol=KKP",
-        "published_at": "2026-11-12T12:33:11+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107656801",
-        "symbol": "TOP",
-        "title": "คำอธิบายและวิเคราะห์ของฝ่ายจัดการ ไตรมาสที่ 3 สิ้นสุดวันที่ 30 ก.ย. 2569",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107656801&symbol=TOP",
-        "published_at": "2026-11-12T08:31:41+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107656601",
-        "symbol": "TOP",
-        "title": "สรุปผลการดำเนินงานของ บจ. ไตรมาสที่ 3 (F45) (สอบทานแล้ว)",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107656601&symbol=TOP",
-        "published_at": "2026-11-12T08:31:30+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107416101",
-        "symbol": "BH",
-        "title": "ชี้แจงผลการดำเนินงาน ไตรมาสที่ 3 สิ้นสุดวันที่ 30 กันยายน 2569",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107416101&symbol=BH",
-        "published_at": "2026-11-12T07:02:48+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    },
-    {
-      "item": {
-        "source_id": "107416001",
-        "symbol": "BH",
-        "title": "สรุปผลการดำเนินงานของ บจ. ไตรมาสที่ 3 (F45) (สอบทานแล้ว)",
-        "url": "https://www.set.or.th/th/market/news-and-alert/newsdetails?id=107416001&symbol=BH",
-        "published_at": "2026-11-12T07:00:45+07:00",
-        "tag": ""
-      },
-      "attempts": 0,
-      "queued_at": "2026-11-12T19:38:53"
-    }
-  ]
+  "pending_push": []
 }
