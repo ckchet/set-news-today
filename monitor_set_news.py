@@ -35,6 +35,12 @@ DEBUG = os.environ.get("DEBUG", "1") == "1"
 BANGKOK_TZ = ZoneInfo("Asia/Bangkok")
 LAST_RUN_HOUR = 22  # ชั่วโมง (เวลาไทย) ของรอบทำงานสุดท้ายในแต่ละวัน ต้องตรงกับตารางใน .github/workflows/monitor.yml
 
+# ==== stock-news-tracker (Push + ACK + retry) ====
+TRACKER_BASE_URL = os.environ.get("TRACKER_BASE_URL", "").rstrip("/")
+TRACKER_INGEST_TOKEN = os.environ.get("TRACKER_INGEST_TOKEN", "")
+PENDING_PUSH_LIMIT = 500
+PENDING_PUSH_MAX_ATTEMPTS = 10
+
 # คำใบ้ที่ใช้เดาว่า field ไหนคือ "หัวข้อข่าว" / "วันที่" / "รหัสข่าว" / "ลิงก์" / "ชื่อหุ้น"
 # (ยืนยันจากข้อมูลจริงของเว็บ SET แล้วว่า field จริงคือ: id, datetime, symbol, headline, url, tag)
 TITLE_KEYS = ["headline", "subject", "title", "header", "newsSubject"]
@@ -304,6 +310,7 @@ def load_state():
     state.setdefault("had_news_today", False)
     state.setdefault("first_notified_today", False)
     state.setdefault("last_summary_sent_today", False)
+    state.setdefault("pending_push", [])
     return state
 
 
@@ -356,6 +363,91 @@ def send_telegram_message(text: str, max_retries: int = 5):
     raise RuntimeError(f"ส่งข้อความเข้า Telegram ไม่สำเร็จหลังลอง {max_retries} ครั้ง (โดน rate limit ต่อเนื่อง)")
 
 
+def tracker_health() -> bool:
+    """เช็คว่า stock-news-tracker ตอบสนองหรือไม่"""
+    if not TRACKER_BASE_URL:
+        return False
+    try:
+        resp = requests.get(f"{TRACKER_BASE_URL}/api/health", timeout=10)
+        return resp.status_code == 200
+    except Exception as e:
+        log("tracker_health failed:", e)
+        return False
+
+
+def push_to_tracker(items: list) -> dict | None:
+    """ส่งข่าวเข้า tracker คืน JSON ที่มี results หรือ None ถ้าส่งไม่สำเร็จ"""
+    if not TRACKER_BASE_URL or not items:
+        return None
+    try:
+        resp = requests.post(
+            f"{TRACKER_BASE_URL}/api/ingest/set-news",
+            json={"items": items},
+            headers={"Authorization": f"Bearer {TRACKER_INGEST_TOKEN}"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        log("push_to_tracker failed:", e)
+        return None
+
+
+def _tracker_item(nid: str, item: dict) -> dict:
+    """แปลงข่าว SET เป็น payload สำหรับ tracker"""
+    link = extract_field(item, LINK_KEYS) or PAGE_URL
+    if isinstance(link, str) and link.startswith("/"):
+        link = "https://www.set.or.th" + link
+    return {
+        "source_id": str(nid),
+        "symbol": str(extract_field(item, SYMBOL_KEYS) or ""),
+        "title": str(extract_field(item, TITLE_KEYS) or ""),
+        "url": str(link),
+        "published_at": str(extract_field(item, DATE_KEYS) or ""),
+        "tag": str(extract_field(item, CATEGORY_KEYS) or ""),
+    }
+
+
+def _queue_pending(state: dict, items: list, attempts: int = 0) -> None:
+    """เพิ่มข่าวที่ยังไม่ถูกแสดงลงคิว (จำกัดจำนวน)"""
+    pending = state.setdefault("pending_push", [])
+    queued_ids = {p.get("item", {}).get("source_id") for p in pending}
+    for it in items:
+        if it.get("source_id") in queued_ids:
+            continue
+        pending.append({
+            "item": it,
+            "attempts": attempts,
+            "queued_at": datetime.now(BANGKOK_TZ).strftime("%Y-%m-%dT%H:%M:%S"),
+        })
+    state["pending_push"] = pending[:PENDING_PUSH_LIMIT]
+
+
+def retry_pending_push(state: dict) -> None:
+    """ลองส่งข่าวที่ค้างอยู่ในคิวก่อนประมวลผลรอบใหม่"""
+    pending = state.get("pending_push", [])
+    if not pending or not tracker_health():
+        return
+    items = [p.get("item", {}) for p in pending]
+    result = push_to_tracker(items)
+    if not result:
+        return
+    done_ids = {
+        str(r.get("source_id"))
+        for r in result.get("results", [])
+        if r.get("status") in ("inserted", "duplicate")
+    }
+    remaining = []
+    for p in pending:
+        sid = str(p.get("item", {}).get("source_id"))
+        if sid in done_ids:
+            continue
+        p["attempts"] = int(p.get("attempts", 0)) + 1
+        if p["attempts"] < PENDING_PUSH_MAX_ATTEMPTS:
+            remaining.append(p)
+    state["pending_push"] = remaining[:PENDING_PUSH_LIMIT]
+
+
 def format_message(item: dict) -> str:
     title = escape_html(extract_field(item, TITLE_KEYS) or "(ไม่พบหัวข้อข่าว)")
     symbol = extract_field(item, SYMBOL_KEYS)
@@ -396,6 +488,10 @@ async def main():
         state["first_notified_today"] = False
         state["last_summary_sent_today"] = False
 
+    # ลองส่งข่าวที่ค้างจากรอบก่อนก่อน (ถ้า tracker กลับมาทำงานแล้ว)
+    retry_pending_push(state)
+    save_state(state)
+
     is_first_run_today = not state["first_notified_today"]
     is_last_run_hour = now_bkk.hour == LAST_RUN_HOUR
 
@@ -430,6 +526,7 @@ async def main():
 
     print(f"พบข่าวใหม่ {len(new_items)} รายการ กำลังส่งเข้า Telegram...")
     sent_count = 0
+    telegram_error = None
     try:
         for nid, item in reversed(new_items):
             send_telegram_message(format_message(item))
@@ -440,10 +537,36 @@ async def main():
             state["seen_ids"] = list(dict.fromkeys(current_ids + list(seen_ids)))[:500]
             save_state(state)
             time.sleep(2)
-    except Exception:
+    except Exception as e:
+        telegram_error = e
         print(f"ส่งข่าวสำเร็จไปแล้ว {sent_count}/{len(new_items)} รายการ ก่อนเกิด error "
               f"(ข่าวที่ส่งสำเร็จแล้วจะไม่ถูกส่งซ้ำในรอบถัดไป ส่วนที่เหลือจะลองใหม่ในรอบหน้า)", file=sys.stderr)
-        raise
+
+    # ส่งเข้า stock-news-tracker (ถ้า server ปิด ให้เก็บคิวไว้ retry รอบหน้า)
+    tracker_items = [_tracker_item(nid, item) for nid, item in new_items]
+    if tracker_health():
+        result = push_to_tracker(tracker_items)
+        if result:
+            done_ids = {
+                str(r.get("source_id"))
+                for r in result.get("results", [])
+                if r.get("status") in ("inserted", "duplicate")
+            }
+            failed = [ti for ti in tracker_items if ti.get("source_id") not in done_ids]
+            if failed:
+                _queue_pending(state, failed, attempts=1)
+                print(f"tracker รับข่าวแล้ว {len(tracker_items) - len(failed)}/{len(tracker_items)} รายการ "
+                      f"— ที่เหลือเก็บคิวไว้ลองใหม่", file=sys.stderr)
+        else:
+            _queue_pending(state, tracker_items, attempts=0)
+            print("ส่งเข้า tracker ไม่สำเร็จ — เก็บข่าวทั้งหมดไว้ในคิว", file=sys.stderr)
+    else:
+        _queue_pending(state, tracker_items, attempts=0)
+        print("tracker ปิดอยู่ — เก็บข่าวไว้ในคิวเพื่อส่งรอบหน้า", file=sys.stderr)
+    save_state(state)
+
+    if telegram_error:
+        raise telegram_error
 
 
 if __name__ == "__main__":

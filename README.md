@@ -164,6 +164,18 @@ TOPIC_KEYWORDS = [
 - Repo แบบ **Private** จะถูกหักโควต้า "Actions minutes" ฟรี 2,000 นาที/เดือน (บัญชี GitHub Free) ต่อการรันแต่ละครั้ง ถ้าใกล้เต็มโควต้า ให้ลดความถี่ลงหรือเปลี่ยน repo เป็น public (public repo ใช้ Actions ฟรีไม่จำกัด)
 - ถ้าเยื้องนาทีแล้วยังรันไม่สม่ำเสมอ ทางเลือกที่แม่นยำกว่าคือใช้บริการ cron ภายนอกฟรี (เช่น cron-job.org) ยิงไปเรียก GitHub REST API `workflow_dispatch` แทนการพึ่ง schedule ในตัวของ GitHub เอง (ต้องใช้ Personal Access Token เพิ่ม) บอกได้ถ้าอยากให้ช่วยตั้งค่าแบบนี้แทน
 
+## ส่งข่าวเข้า stock-news-tracker (Push + Retry)
+นอกจาก Telegram แล้ว สคริปต์ยังส่งข่าวใหม่เข้า `stock-news-tracker` เพื่อแสดงบนเว็บด้วย
+ตั้งค่า 2 ตัวใน GitHub Secrets:
+- `TRACKER_BASE_URL` — URL ของ tracker (เช่น `https://xxxx.trycloudflare.com`)
+- `TRACKER_INGEST_TOKEN` — token ที่ตรงกับ `INGEST_TOKEN` ใน `.env` ของ tracker
+
+พฤติกรรม:
+- ถ้า tracker ทำงาน → ส่งข่าวเข้า tracker ทันที (หลังส่ง Telegram)
+- ถ้า tracker ปิด/ส่งไม่สำเร็จ → เก็บข่าวไว้ใน `state.json` (`pending_push`) แล้วลองใหม่รอบถัดไป
+- ถ้า tracker ตอบว่ามีข่าวนั้นแล้ว (duplicate) → ถือว่าแสดงผลแล้ว ข้าม
+- คิวสูงสุด 500 รายการ, ลองซ้ำสูงสุด 10 ครั้ง
+
 ## ข้อจำกัดที่ควรรู้
 - GitHub Actions แบบ schedule มีดีเลย์ได้บ้าง (ปกติไม่เกิน 2-3 นาที) ไม่ใช่ real-time เป๊ะๆ
 - สคริปต์เดาโครงสร้างข้อมูลข่าวจาก JSON ที่เว็บ SET ส่งมาเองแบบอัตโนมัติ ถ้าทาง SET เปลี่ยนโครงสร้างเว็บ
